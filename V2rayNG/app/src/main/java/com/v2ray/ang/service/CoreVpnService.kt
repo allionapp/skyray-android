@@ -82,6 +82,21 @@ class CoreVpnService : VpnService(), ServiceControl {
         CoreServiceManager.serviceControl = SoftReference(this)
     }
 
+    /**
+     * The app was swiped away while a rewarded ad was still on screen (Play build only; the flag
+     * is never set otherwise): the connection it was paying for ends with it. A stale flag from
+     * a process that died is ignored after ten minutes, longer than any ad runs.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        val shownAt = MmkvManager.decodeSettingsLong(AppConfig.PREF_SKYRAY_AD_SHOWN_AT, 0L)
+        if (shownAt > 0 && System.currentTimeMillis() - shownAt < 10 * 60 * 1000L) {
+            MmkvManager.encodeSettings(AppConfig.PREF_SKYRAY_AD_SHOWN_AT, 0L)
+            LogUtil.i(AppConfig.TAG, "StartCore-VPN: app left with the ad unfinished; stopping")
+            stopAllService()
+        }
+    }
+
     override fun onRevoke() {
         LogUtil.w(AppConfig.TAG, "StartCore-VPN: Permission revoked")
         stopAllService()

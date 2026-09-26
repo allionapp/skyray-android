@@ -207,6 +207,7 @@
                         android:text="@string/etha_renew" />
 
                     <Space
+                        android:id="@+id/space_renew"
                         android:layout_width="10dp"
                         android:layout_height="1dp" />
 

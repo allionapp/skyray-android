@@ -31,6 +31,7 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
+import com.v2ray.ang.handler.AdsGate
 import com.v2ray.ang.handler.Updates
 import com.v2ray.ang.handler.UpdateCheckerManager
 import com.v2ray.ang.util.LogUtil
@@ -59,6 +60,7 @@ class HomeActivity : HelperBaseActivity() {
     private val mainViewModel: MainViewModel by viewModels()
     private var sub: SubscriptionCache? = null
     private var connecting = false        // waiting for the core to report started / stopped
+    private var wasRunning: Boolean? = null   // null until the first state arrives: opening Home while connected is no connect
     private var refreshingQuietly = false // a background subscription refresh is running
     private var clipboardTried: String? = null   // the link last taken from the clipboard (no second import of the same one)
     private var pendingConnect = false    // waiting for a real-delay batch to pick the line
@@ -93,6 +95,10 @@ class HomeActivity : HelperBaseActivity() {
         binding.btnScan.setOnClickListener { scanLink() }
         binding.btnRefresh.setOnClickListener { refreshServers() }
         binding.btnRenew.setOnClickListener { Utils.openUri(this, AppConfig.ETHA_RENEW_URL) }
+        // Google Play takes payment for digital services through its own billing only, so the
+        // Play build does not send anyone off to buy; Support still reaches the same people.
+        binding.btnRenew.isVisible = !Updates.isPlay()
+        binding.spaceRenew.isVisible = !Updates.isPlay()
         binding.btnSupport.setOnClickListener { Utils.openUri(this, AppConfig.ETHA_SUPPORT_URL) }
         binding.btnTest.setOnClickListener { testAgain() }
         binding.ddServer.setOnItemClickListener { _, _, position, _ ->
@@ -111,6 +117,14 @@ class HomeActivity : HelperBaseActivity() {
             connecting = false
             render()
             if (running) mainViewModel.testCurrentServerRealPing()
+            if (running && wasRunning == false) {
+                // The Play build's ad; the connection lasts only if it is watched through.
+                AdsGate.showAfterConnect(this) {
+                    CoreServiceManager.stopVService(this)
+                    toastError(R.string.skyray_ad_required)
+                }
+            }
+            wasRunning = running
         }
         mainViewModel.updateTestResultAction.observe(this) { binding.tvLine.text = lineText(it) }
         mainViewModel.testsFinished.observe(this) {
@@ -139,6 +153,7 @@ class HomeActivity : HelperBaseActivity() {
                 render()
             }
         }
+        AdsGate.start(this)
         mainViewModel.startListenBroadcast()
         mainViewModel.initAssets(assets)
         SubscriptionUpdater.sync()
@@ -217,7 +232,8 @@ class HomeActivity : HelperBaseActivity() {
                 else -> R.string.etha_state_not_connected
             }
         )
-        binding.tvConnectHint.text = getString(if (running) R.string.etha_tap_to_disconnect else R.string.etha_tap_to_connect)
+        binding.tvConnectHint.text = getString(if (running) R.string.etha_tap_to_disconnect else R.string.etha_tap_to_connect) +
+            if (!running && AdsGate.SHOWS_ADS) "\n" + getString(R.string.skyray_ad_hint) else ""
         binding.btnConnect.isEnabled = !connecting && !pendingConnect
         binding.btnConnect.backgroundTintList = ColorStateList.valueOf(
             ContextCompat.getColor(this, if (running) R.color.colorPing else R.color.md_theme_primary)

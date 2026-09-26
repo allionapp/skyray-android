@@ -8,4 +8,11 @@
         android:name="android.permission.REQUEST_INSTALL_PACKAGES"
         tools:node="remove" />
 
+    <application>
+        <!-- SkyRay's AdMob app (Android); the ad itself is AdsGate in src/play. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-8085563084618250~7581627992" />
+    </application>
+
 </manifest>

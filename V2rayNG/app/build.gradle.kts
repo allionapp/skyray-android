@@ -113,6 +113,12 @@ android {
 }
 
 dependencies {
+    // The Google Play build's ad (AdsGate in src/play); the direct build has none.
+    "playImplementation"("com.google.android.gms:play-services-ads:23.6.0")
+    "playImplementation"("com.google.android.ump:user-messaging-platform:3.1.0")
+    // The ads SDK brings Guava at runtime only, which leaves WorkManager's ListenableFuture
+    // resolved to Guava's empty stub at compile time; the same version, made visible.
+    "playImplementation"("com.google.guava:guava:31.1-android")
     // Core Libraries
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
 
