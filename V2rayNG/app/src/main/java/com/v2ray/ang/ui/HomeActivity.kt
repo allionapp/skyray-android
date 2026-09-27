@@ -11,6 +11,7 @@ import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.v2ray.ang.AppConfig
@@ -94,6 +95,8 @@ class HomeActivity : HelperBaseActivity() {
         binding.btnPaste.setOnClickListener { pasteLink() }
         binding.btnScan.setOnClickListener { scanLink() }
         binding.btnRefresh.setOnClickListener { refreshServers() }
+        binding.btnAddLink.setOnClickListener { addAnotherLink() }
+        binding.tvSubName.setOnClickListener { showLinks() }
         binding.btnRenew.setOnClickListener { Utils.openUri(this, AppConfig.ETHA_RENEW_URL) }
         // Google Play takes payment for digital services through its own billing only, so the
         // Play build does not send anyone off to buy; Support still reaches the same people.
@@ -290,7 +293,10 @@ class HomeActivity : HelperBaseActivity() {
     }
 
     private fun renderAccount(item: SubscriptionItem) {
-        binding.tvSubName.text = item.profileTitle ?: item.remarks
+        val links = EthaSubscription.all()
+        val name = sub?.let { s -> links.indexOfFirst { it.guid == s.guid }.takeIf { it >= 0 }?.let { EthaSubscription.labels(links)[it] } }
+            ?: item.profileTitle ?: item.remarks
+        binding.tvSubName.text = if (links.size > 1) "$name  ▾" else name
         val days = EthaSubscription.daysLeft(item.expire)
         when {
             days == null -> { binding.tvDays.text = "–"; binding.tvDaysLabel.text = getString(R.string.etha_days_label) }
@@ -432,11 +438,72 @@ class HomeActivity : HelperBaseActivity() {
         }
     }
 
-    /** Adds the subscription (or refreshes it when it is already there) and connects. */
+    // ---------------------------------------------------------------- several links
+
+    /** A second (third…) link next to the first: from the clipboard or a QR code, as on the empty card. */
+    private fun addAnotherLink() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.etha_add_another_link)
+            .setItems(arrayOf(getString(R.string.etha_paste_link), getString(R.string.etha_scan_qr))) { _, which ->
+                if (which == 0) pasteLink() else scanLink()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Every link on the phone: tap one to use it, or remove the one in use. */
+    private fun showLinks() {
+        val links = EthaSubscription.all()
+        if (links.isEmpty()) return
+        val current = links.indexOfFirst { it.guid == sub?.guid }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.etha_links_title)
+            .setSingleChoiceItems(EthaSubscription.labels(links).toTypedArray(), current) { dialog, which ->
+                dialog.dismiss()
+                if (which != current) useLink(links[which].guid)
+            }
+            .setPositiveButton(R.string.etha_add_another_link) { _, _ -> addAnotherLink() }
+            .setNeutralButton(R.string.etha_link_remove) { _, _ -> confirmRemoveLink() }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Home switches to this link; while connected, the connection moves to its best line. */
+    private fun useLink(subId: String) {
+        if (sub?.guid == subId) return
+        EthaSubscription.setActive(subId)
+        MmkvManager.encodeSettings(AppConfig.PREF_ETHA_PINNED, false)
+        refreshSubscription()
+        sub?.let { toast(getString(R.string.etha_link_using, EthaSubscription.label(it))) }
+        onServerChoiceChanged()
+    }
+
+    private fun confirmRemoveLink() {
+        val s = sub ?: return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.etha_link_remove)
+            .setMessage(getString(R.string.etha_link_remove_confirm, EthaSubscription.label(s)))
+            .setPositiveButton(R.string.etha_delete_account_do) { _, _ -> removeLink(s.guid) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun removeLink(subId: String) {
+        val wasRunning = mainViewModel.isRunning.value == true && EthaSubscription.selectedIsIn(subId)
+        if (wasRunning) CoreServiceManager.stopVService(this)
+        EthaSubscription.remove(subId)
+        refreshSubscription()
+        render()
+        toastSuccess(R.string.etha_link_removed)
+    }
+
+    /** Adds the subscription (or refreshes it when it is already there), shows it and connects. */
     private fun importLink(raw: String) {
         val link = EthaSubscription.extractSubLink(raw) ?: raw
         MmkvManager.encodeSettings(AppConfig.PREF_ETHA_DELETED_LINK, "")   // asked for by hand: no longer "deleted"
         val named = if (link.contains('#')) link else "$link#${AppConfig.ETHA_SUB_NAME}"
+        val before = MmkvManager.decodeSubscriptions().map { it.guid }.toSet()
+        val shownBefore = sub?.guid
         showLoading()
         lifecycleScope.launch(Dispatchers.IO) {
             val (count, countSub) = try {
@@ -449,16 +516,30 @@ class HomeActivity : HelperBaseActivity() {
                 // The same link again (a renewal, a reinstall): refresh instead of failing.
                 try { AngConfigManager.updateConfigViaSubAll() } catch (e: Exception) { LogUtil.e(AppConfig.TAG, "Failed to refresh", e) }
             }
+            // The link just added (or found again) is the one Home shows from now on.
+            val added = MmkvManager.decodeSubscriptions().firstOrNull { it.guid !in before }
+            val target = added ?: EthaSubscription.findByLink(link)
+            val targetServers = target?.let { MmkvManager.decodeServerList(it.guid) }.orEmpty()
+            if (target != null && targetServers.isNotEmpty()) {
+                EthaSubscription.setActive(target.guid)
+            } else if (added != null && shownBefore != null) {
+                // A new link that brought no servers must not push aside the one that works.
+                EthaSubscription.remove(added.guid)
+            }
             withContext(Dispatchers.Main) {
                 hideLoading()
                 refreshSubscription()
                 render()
                 SubscriptionUpdater.sync(forceReschedule = true)   // the background refresh, timed from this fetch
-                val servers = sub?.let { MmkvManager.decodeServerList(it.guid) }.orEmpty()
-                if (servers.isEmpty()) {
+                if (targetServers.isEmpty()) {
                     toastError(R.string.import_subscription_failure)
                 } else {
                     toastSuccess(R.string.etha_link_added)
+                    if (shownBefore != null && sub?.guid != shownBefore) {
+                        // Another link now: a fresh pick of its best line, and a move over if connected.
+                        MmkvManager.encodeSettings(AppConfig.PREF_ETHA_PINNED, false)
+                        if (mainViewModel.isRunning.value == true) onServerChoiceChanged() else render()
+                    }
                     if (mainViewModel.isRunning.value != true && !connecting && !pendingConnect) onConnectClick()
                 }
             }

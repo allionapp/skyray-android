@@ -102,11 +102,57 @@ object EthaSubscription {
 
     // ---------------------------------------------------------------- storage-backed (Android)
 
-    /** The EthaVPN subscription if there is one, else the first enabled subscription (the app also works as a plain client). */
+    /**
+     * The link Home shows: the one the customer chose among several, else the EthaVPN
+     * subscription if there is one, else the first enabled subscription (the app also works as
+     * a plain client).
+     */
     fun find(): SubscriptionCache? {
-        val subs = MmkvManager.decodeSubscriptions()
-        return subs.firstOrNull { isSubLink(it.subscription.url) && it.subscription.enabled }
-            ?: subs.firstOrNull { it.subscription.enabled }
+        val subs = all()
+        val active = MmkvManager.decodeSettingsString(AppConfig.PREF_ETHA_ACTIVE_SUB)
+        return subs.firstOrNull { it.guid == active }
+            ?: subs.firstOrNull { isSubLink(it.subscription.url) }
+            ?: subs.firstOrNull()
+            ?: MmkvManager.decodeSubscriptions().firstOrNull { it.subscription.enabled }
+    }
+
+    /** Every link the customer added (enabled subscriptions with a URL), in the order they were added. */
+    fun all(): List<SubscriptionCache> =
+        MmkvManager.decodeSubscriptions().filter { it.subscription.enabled && it.subscription.url.isNotBlank() }
+
+    fun setActive(subId: String) = MmkvManager.encodeSettings(AppConfig.PREF_ETHA_ACTIVE_SUB, subId)
+
+    /** The stored subscription with this link (the fragment, which only names it, aside). */
+    fun findByLink(link: String): SubscriptionCache? {
+        val bare = link.substringBefore('#').trim()
+        return MmkvManager.decodeSubscriptions().firstOrNull { it.subscription.url.substringBefore('#').trim() == bare }
+    }
+
+    /** The name a link goes by in the list: the API's title, else its remark. */
+    fun label(sub: SubscriptionCache): String =
+        sub.subscription.profileTitle?.takeIf { it.isNotBlank() } ?: sub.subscription.remarks.ifBlank { AppConfig.ETHA_SUB_NAME }
+
+    /** Labels for a list of links; two links with the same name get a number, so they can be told apart. */
+    fun labels(subs: List<SubscriptionCache>): List<String> {
+        val names = subs.map { label(it) }
+        val seen = mutableMapOf<String, Int>()
+        return names.map { name ->
+            if (names.count { it == name } < 2) name else "$name ${seen.merge(name, 1, Int::plus)}"
+        }
+    }
+
+    /** One link and its servers leave the phone; the others stay. */
+    fun remove(subId: String) {
+        val wasShown = find()?.guid == subId
+        if (selectedIsIn(subId)) MmkvManager.setSelectServer("")
+        SubscriptionUpdater.cancelOne(subId = subId)
+        MmkvManager.removeSubscription(subId)
+        if (wasShown) {
+            // Home moves on to another link: its best line is picked afresh
+            setActive("")
+            MmkvManager.encodeSettings(AppConfig.PREF_ETHA_PINNED, false)
+            MmkvManager.encodeSettings(AppConfig.PREF_ETHA_LAST_TEST, 0L)
+        }
     }
 
     /**
@@ -126,6 +172,7 @@ object EthaSubscription {
         MmkvManager.setSelectServer("")
         MmkvManager.encodeSettings(AppConfig.PREF_ETHA_PINNED, false)
         MmkvManager.encodeSettings(AppConfig.PREF_ETHA_LAST_TEST, 0L)
+        MmkvManager.encodeSettings(AppConfig.PREF_ETHA_ACTIVE_SUB, "")
         MmkvManager.encodeSettings(AppConfig.PREF_ETHA_DELETED_LINK, link)
     }
 

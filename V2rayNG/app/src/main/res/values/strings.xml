@@ -508,6 +508,12 @@
     <string name="etha_keep_line">Keep this server</string>
     <string name="etha_link_invalid">That is not an EthaVPN link</string>
     <string name="etha_link_added">Subscription added</string>
+    <string name="etha_add_another_link">+ Add another link</string>
+    <string name="etha_links_title">Your links</string>
+    <string name="etha_link_remove">Remove this link</string>
+    <string name="etha_link_remove_confirm">%s and its servers are removed from this phone. The link itself keeps working, so you can add it again any time.</string>
+    <string name="etha_link_removed">Link removed</string>
+    <string name="etha_link_using">Using %s</string>
     <string name="etha_no_line">No server answered. Check your internet and try again.</string>
     <string name="etha_switched">Switched to %s</string>
     <string name="etha_update_available">Version %s is available. Tap to update.</string>

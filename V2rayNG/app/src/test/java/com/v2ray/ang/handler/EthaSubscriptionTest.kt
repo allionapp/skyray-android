@@ -151,4 +151,12 @@ class EthaSubscriptionTest {
         assertEquals(180L, AppConfig.ETHA_SUB_UPDATE_MINUTES)                 // = the API's 3 h
         assertEquals(180L, EthaSubscription.updateIntervalMinutes("3"))
     }
+
+    @Test
+    fun labelsNumberOnlyRepeatedNames() {
+        fun sub(guid: String, remarks: String, title: String? = null) =
+            com.v2ray.ang.dto.entities.SubscriptionCache(guid, SubscriptionItem(remarks = remarks).apply { profileTitle = title })
+        val subs = listOf(sub("a", "EthaVPN"), sub("b", "EthaVPN"), sub("c", "EthaVPN", "Sifaro"), sub("d", ""))
+        assertEquals(listOf("EthaVPN 1", "EthaVPN 2", "Sifaro", "EthaVPN 3"), EthaSubscription.labels(subs))
+    }
 }

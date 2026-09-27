@@ -484,6 +484,12 @@
     <string name="etha_keep_line">همین سرور بماند</string>
     <string name="etha_link_invalid">این لینک EthaVPN نیست</string>
     <string name="etha_link_added">اشتراک اضافه شد</string>
+    <string name="etha_add_another_link">+ افزودن لینک دیگر</string>
+    <string name="etha_links_title">لینک‌های شما</string>
+    <string name="etha_link_remove">حذف این لینک</string>
+    <string name="etha_link_remove_confirm">«%s» و سرورهایش از این گوشی حذف می‌شوند. خود لینک همچنان کار می‌کند و هر وقت خواستید می‌توانید دوباره اضافه‌اش کنید.</string>
+    <string name="etha_link_removed">لینک حذف شد</string>
+    <string name="etha_link_using">استفاده از %s</string>
     <string name="etha_no_line">هیچ سروری پاسخ نداد. اینترنت را بررسی کنید و دوباره امتحان کنید.</string>
     <string name="etha_switched">به %s تغییر کرد</string>
     <string name="etha_update_available">نسخه‌ی %s آماده است. برای بروزرسانی بزنید.</string>
