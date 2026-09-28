@@ -5,6 +5,11 @@ plugins {
 }
 
 android {
+    // Only the languages the app itself is translated into. Libraries bring dozens more, and
+    // Google Play refuses a bundle whose "he" it cannot handle for translation.
+    androidResources {
+        localeFilters += listOf("en", "ar", "bn", "bqi-rIR", "fa", "ru", "vi", "zh-rCN", "zh-rTW")
+    }
     namespace = "com.v2ray.ang"
     compileSdk = 37
 
@@ -17,8 +22,8 @@ android {
         targetSdk = 37
         // 4000000 + the build number: the same code in every ABI split and in the Play bundle, so a
         // phone can move between the direct APK and the Play install (the updater compares versionName).
-        versionCode = 4000115
-        versionName = "1.1.5"
+        versionCode = 4000116
+        versionName = "1.1.6"
         multiDexEnabled = true
         manifestPlaceholders["subHost"] = "fra.mobileiphone.org"
 
