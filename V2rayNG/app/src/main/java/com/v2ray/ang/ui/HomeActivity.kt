@@ -32,6 +32,7 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
+import com.v2ray.ang.handler.AdSignalOverride
 import com.v2ray.ang.handler.AdsGate
 import com.v2ray.ang.handler.Updates
 import com.v2ray.ang.handler.UpdateCheckerManager
@@ -121,15 +122,25 @@ class HomeActivity : HelperBaseActivity() {
             render()
             if (running) mainViewModel.testCurrentServerRealPing()
             if (running && wasRunning == false) {
-                // The Play build's ad; the connection lasts only if it is watched through.
+                // The Play build's ad, over the tunnel and with the exit's locale (neutral until the
+                // probe names the country); the connection lasts only if it is watched through.
+                AdSignalOverride.apply(null)
                 AdsGate.showAfterConnect(this) {
                     CoreServiceManager.stopVService(this)
                     toastError(R.string.skyray_ad_required)
                 }
             }
+            if (!running) {
+                AdsGate.onTunnelDown()
+                AdSignalOverride.restore()
+            }
             wasRunning = running
         }
-        mainViewModel.updateTestResultAction.observe(this) { binding.tvLine.text = lineText(it) }
+        mainViewModel.updateTestResultAction.observe(this) {
+            binding.tvLine.text = lineText(it)
+            // "(DE) 1.2.3.4", seen through the tunnel: the ad signals follow the exit's country.
+            AdSignalOverride.refine(AdSignalOverride.countryFromProbe(it?.lines()?.lastOrNull()))
+        }
         mainViewModel.testsFinished.observe(this) {
             AutoSelect.markTested()
             if (pendingConnect) {
@@ -156,7 +167,6 @@ class HomeActivity : HelperBaseActivity() {
                 render()
             }
         }
-        AdsGate.start(this)
         mainViewModel.startListenBroadcast()
         mainViewModel.initAssets(assets)
         SubscriptionUpdater.sync()

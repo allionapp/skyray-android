@@ -21,6 +21,7 @@ import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.contracts.ServiceControl
 import com.v2ray.ang.contracts.Tun2SocksControl
 import com.v2ray.ang.core.CoreServiceManager
+import com.v2ray.ang.handler.TunnelSelf
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.NotificationManager
 import com.v2ray.ang.handler.SettingsManager
@@ -221,6 +222,9 @@ class CoreVpnService : VpnService(), ServiceControl {
         try {
             mInterface = builder.establish()!!
             isRunning = true
+            // Before the core starts: every socket it dials stays out of this tunnel.
+            TunnelSelf.vpnService = this
+            TunnelSelf.installProtector(this)
             return true
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to establish VPN interface", e)
@@ -313,23 +317,33 @@ class CoreVpnService : VpnService(), ServiceControl {
      */
     private fun configurePerAppProxy(builder: Builder) {
         val selfPackageName = BuildConfig.APPLICATION_ID
+        // The Play build keeps the app inside its own tunnel (see TunnelSelf): the core's sockets
+        // are protected instead, and the test process binds its sockets past the VPN (allowBypass).
+        val selfInside = TunnelSelf.wanted
+        if (selfInside) builder.allowBypass()
 
         // If per-app proxy is not enabled, disallow the VPN service's own package and return
         if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PER_APP_PROXY) == false) {
-            builder.addDisallowedApplication(selfPackageName)
+            if (!selfInside) builder.addDisallowedApplication(selfPackageName)
             return
         }
 
         // If no apps are selected, disallow the VPN service's own package and return
         val apps = MmkvManager.decodeSettingsStringSet(AppConfig.PREF_PER_APP_PROXY_SET)
         if (apps.isNullOrEmpty()) {
-            builder.addDisallowedApplication(selfPackageName)
+            if (!selfInside) builder.addDisallowedApplication(selfPackageName)
             return
         }
 
         val bypassApps = MmkvManager.decodeSettingsBool(AppConfig.PREF_BYPASS_APPS)
-        // Handle the VPN service's own package according to the mode
-        if (bypassApps) apps.add(selfPackageName) else apps.remove(selfPackageName)
+        // Handle the VPN service's own package according to the mode. Kept inside (TunnelSelf),
+        // it is left off the bypass list and put on the allow list; otherwise, as in v2rayNG,
+        // it goes around its own tunnel.
+        when {
+            bypassApps && !selfInside -> apps.add(selfPackageName)
+            !bypassApps && selfInside -> apps.add(selfPackageName)
+            else -> apps.remove(selfPackageName)
+        }
 
         apps.forEach {
             try {
@@ -371,6 +385,7 @@ class CoreVpnService : VpnService(), ServiceControl {
 //        val info = loadVpnNetworkInfo(configName, emptyInfo)!! + (lastNetworkInfo ?: emptyInfo)
 //        saveVpnNetworkInfo(configName, info)
         isRunning = false
+        TunnelSelf.vpnService = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
                 connectivity.unregisterNetworkCallback(defaultNetworkCallback)

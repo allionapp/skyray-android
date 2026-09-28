@@ -6,7 +6,7 @@ import android.app.Activity
 object AdsGate {
     const val SHOWS_ADS = false
 
-    fun start(activity: Activity) = Unit
-
     fun showAfterConnect(activity: Activity, onSkipped: () -> Unit) = Unit
+
+    fun onTunnelDown() = Unit
 }

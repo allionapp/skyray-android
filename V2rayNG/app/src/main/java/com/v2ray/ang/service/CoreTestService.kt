@@ -11,6 +11,7 @@ import com.v2ray.ang.dto.TestServiceMessage
 import com.v2ray.ang.enums.NotificationChannelType
 import com.v2ray.ang.extension.serializable
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.handler.TunnelSelf
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.NotificationHelper
@@ -27,6 +28,8 @@ class CoreTestService : Service() {
     override fun onCreate() {
         super.onCreate()
         CoreNativeManager.initCoreEnv(this)
+        // The app rides its own tunnel in the Play build; a delay test must still go straight out.
+        TunnelSelf.installProtector(this)
     }
 
     /**
