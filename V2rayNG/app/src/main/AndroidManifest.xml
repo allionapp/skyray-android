@@ -169,18 +169,19 @@
                 <data android:host="install-config" />
                 <data android:host="install-sub" />
             </intent-filter>
-            <!-- App Links: a verified app opens the subscription link itself, no page in between
-                 (statement: https://${subHost}/.well-known/assetlinks.json) -->
+            <!-- App Links: a verified app opens the subscription link itself, no page in between, on
+                 every address the link has had (statement: https://<host>/.well-known/assetlinks.json) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
 
                 <category android:name="android.intent.category.BROWSABLE" />
                 <category android:name="android.intent.category.DEFAULT" />
 
-                <data
-                    android:host="${subHost}"
-                    android:pathPrefix="/sub/"
-                    android:scheme="https" />
+                <data android:scheme="https" />
+                <data android:host="${subHost}" />
+                <data android:host="${subHost2}" />
+                <data android:host="${subHost3}" />
+                <data android:pathPrefix="/sub/" />
             </intent-filter>
         </activity>
         <activity

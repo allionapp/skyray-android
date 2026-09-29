@@ -127,9 +127,14 @@ object AppConfig {
     const val UPSTREAM_URL = "$GITHUB_URL/2dust/v2rayNG"
     const val TG_CHANNEL_URL = "https://t.me/vpnandfree"
 
-    /** EthaVPN: the service this build (the SkyRay app) is made for. */
-    const val ETHA_SUB_HOST = "fra.mobileiphone.org"
-    val ETHA_SUB_HOSTS = listOf(ETHA_SUB_HOST)
+    /**
+     * EthaVPN: the service this build (the SkyRay app) is made for. Our link's addresses, the current one
+     * first (fra.skyrayconfig.org since 2026-09-29, a link-only domain); the older two answer the same links.
+     * A phone on an older one moves to the service's current address by itself: every fetch names it in
+     * Profile-Web-Page-Url (EthaSubscription.adoptedUrl). The tunnels' address comes from the subscription.
+     */
+    const val ETHA_SUB_HOST = "fra.skyrayconfig.org"
+    val ETHA_SUB_HOSTS = listOf(ETHA_SUB_HOST, "fra.mobileiphonez.org", "fra.mobileiphone.org")
     const val ETHA_SUB_PATH = "/sub/"
     const val ETHA_SUB_NAME = "EthaVPN"
     const val ETHA_USER_AGENT = "SkyRay/${BuildConfig.VERSION_NAME} (android)"   // how the server knows this app fetched
@@ -139,8 +144,9 @@ object AppConfig {
     // wins and the APK comes from that same host. mobileiphone.org is filtered in Iran; the old host stays
     // second so a phone that can still reach only it keeps updating.
     const val ETHA_DL_HOST = "fra.mobileiphonez.org"
+    const val ETHA_DL_FALLBACK_HOST = "fra.mobileiphone.org"   // where 1.1.5 and older look; the same /dl/
     const val ETHA_DOWNLOAD_BASE = "https://$ETHA_DL_HOST/dl/"
-    val ETHA_DOWNLOAD_BASES = listOf(ETHA_DOWNLOAD_BASE, "https://$ETHA_SUB_HOST/dl/")
+    val ETHA_DOWNLOAD_BASES = listOf(ETHA_DOWNLOAD_BASE, "https://$ETHA_DL_FALLBACK_HOST/dl/")
     const val ETHA_BOT_URL = "https://t.me/Ethaconfigbot"
     const val ETHA_RENEW_URL = "$ETHA_BOT_URL?start=app_renew"
     const val ETHA_SUPPORT_URL = "$ETHA_BOT_URL?start=app_support"

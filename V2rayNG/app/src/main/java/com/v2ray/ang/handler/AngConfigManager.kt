@@ -512,7 +512,7 @@ object AngConfigManager {
             val subscriptions = MmkvManager.decodeSubscriptions()
             subscriptions.fold(SubscriptionUpdateResult()) { acc, subscription ->
                 acc + updateConfigViaSub(subscription)
-            }
+            }.also { EthaSubscription.mergeDuplicates() }   // after the loop: two copies may now share an address
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to update config via all subscriptions", e)
             SubscriptionUpdateResult()
@@ -594,6 +594,12 @@ object AngConfigManager {
                 // The account card: days and data left, a notice, the support link — from the
                 // response headers. A header that is missing or broken leaves the profile alone.
                 EthaSubscription.applyHeaders(it.subscription, response.headers)
+                // The service names its current link address in Profile-Web-Page-Url: a phone still on an
+                // older one moves to it by itself (same token, listed addresses only).
+                EthaSubscription.adoptedUrl(it.subscription.url, it.subscription.webPageUrl)?.let { next ->
+                    LogUtil.i(AppConfig.TAG, "Subscription moves to the service's current link address")
+                    it.subscription.url = next
+                }
                 MmkvManager.encodeSubscription(it.guid, it.subscription)
                 LogUtil.i(AppConfig.TAG, "Subscription updated: ${it.subscription.remarks}, $count configs")
                 return SubscriptionUpdateResult(
@@ -639,6 +645,18 @@ object AngConfigManager {
         val subscriptions = MmkvManager.decodeSubscriptions()
         subscriptions.forEach {
             if (it.subscription.url == url) {
+                return 0
+            }
+        }
+        // The same account on another of our addresses (the new link after a move, or an old one tapped
+        // again): no second copy; the subscription keeps the newer address.
+        EthaSubscription.tokenOf(url)?.let { token ->
+            subscriptions.firstOrNull { EthaSubscription.tokenOf(it.subscription.url) == token }?.let { same ->
+                val keep = EthaSubscription.better(same.subscription.url, url)
+                if (keep != same.subscription.url) {
+                    same.subscription.url = keep
+                    MmkvManager.encodeSubscription(same.guid, same.subscription)
+                }
                 return 0
             }
         }

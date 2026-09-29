@@ -194,6 +194,7 @@ class HomeActivity : HelperBaseActivity() {
     // ---------------------------------------------------------------- state
 
     private fun refreshSubscription() {
+        EthaSubscription.mergeDuplicates()   // the old and the new link of one account: one subscription
         sub = EthaSubscription.find()
         mainViewModel.subscriptionIdChanged(sub?.guid ?: "")
     }

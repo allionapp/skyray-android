@@ -75,6 +75,39 @@ object EthaSubscription {
         return token.length >= 8 && token.none { it == '/' }
     }
 
+    /** Where a link's host sits in ETHA_SUB_HOSTS: 0 = the current address; -1 = not one of ours. */
+    fun hostRank(url: String?): Int {
+        val host = try { URI(url?.trim() ?: return -1).host } catch (_: Exception) { return -1 } ?: return -1
+        return AppConfig.ETHA_SUB_HOSTS.indexOfFirst { it.equals(host, ignoreCase = true) }
+    }
+
+    /** The account token of one of our links (what stays the same when the address moves), else null. */
+    fun tokenOf(url: String?): String? {
+        if (!isSubLink(url)) return null
+        return URI(url!!.trim()).path.substring(AppConfig.ETHA_SUB_PATH.length)
+    }
+
+    /**
+     * The URL a subscription moves to after a fetch: the service names its current link in
+     * Profile-Web-Page-Url on every answer. Taken only when both are our links (listed hosts), the
+     * token is the same and the address differs; the name after '#' stays. Else null: keep the URL.
+     */
+    fun adoptedUrl(current: String?, webPageUrl: String?): String? {
+        val token = tokenOf(current) ?: return null
+        val cur = current!!.trim()
+        val next = webPageUrl?.trim()?.substringBefore('#') ?: return null
+        if (tokenOf(next) != token) return null
+        if (URI(cur).host.equals(URI(next).host, ignoreCase = true)) return null
+        val name = cur.substringAfter('#', "")
+        return if (name.isEmpty()) next else "$next#$name"
+    }
+
+    /** Of two links to the same account, the one to keep: the address earlier in ETHA_SUB_HOSTS (the newer). */
+    fun better(a: String, b: String): String {
+        val ra = hostRank(a); val rb = hostRank(b)
+        return if (rb >= 0 && (ra < 0 || rb < ra)) b else a
+    }
+
     /** The link inside pasted text (a Telegram message adds words and punctuation around it). */
     fun extractSubLink(text: String?): String? =
         text?.split(Regex("\\s+"))
@@ -102,11 +135,43 @@ object EthaSubscription {
 
     // ---------------------------------------------------------------- storage-backed (Android)
 
-    /** The EthaVPN subscription if there is one, else the first enabled subscription (the app also works as a plain client). */
+    /**
+     * The EthaVPN subscription if there is one (the newest address first), else the first enabled
+     * subscription (the app also works as a plain client).
+     */
     fun find(): SubscriptionCache? {
         val subs = MmkvManager.decodeSubscriptions()
-        return subs.firstOrNull { isSubLink(it.subscription.url) && it.subscription.enabled }
+        return subs.filter { isSubLink(it.subscription.url) && it.subscription.enabled }
+            .minByOrNull { hostRank(it.subscription.url) }
             ?: subs.firstOrNull { it.subscription.enabled }
+    }
+
+    /**
+     * One subscription per account. A phone that imported the new link beside the old one (before this
+     * version knew the new address), or whose two copies both moved, holds the same token twice: they
+     * become the one with the selected server (else the first), on the newest address; the others go
+     * with their servers. Never call it inside a loop over the subscriptions. True when something changed.
+     */
+    fun mergeDuplicates(): Boolean {
+        var changed = false
+        MmkvManager.decodeSubscriptions()
+            .filter { tokenOf(it.subscription.url) != null }
+            .groupBy { tokenOf(it.subscription.url) }
+            .values.filter { it.size > 1 }
+            .forEach { same ->
+                val keep = same.firstOrNull { selectedIsIn(it.guid) } ?: same.first()
+                val url = same.map { it.subscription.url }.reduce { a, b -> better(a, b) }
+                same.filter { it.guid != keep.guid }.forEach {
+                    SubscriptionUpdater.cancelOne(subId = it.guid)
+                    MmkvManager.removeSubscription(it.guid)
+                }
+                if (keep.subscription.url != url) {
+                    keep.subscription.url = url
+                    MmkvManager.encodeSubscription(keep.guid, keep.subscription)
+                }
+                changed = true
+            }
+        return changed
     }
 
     /**

@@ -16,7 +16,8 @@ class UpdateCheckerManagerTest {
     @Test
     fun downloadsComeFromTheNewHostFirstAndTheApkFromTheHostThatAnswered() {
         assertEquals("https://fra.mobileiphonez.org/dl/", AppConfig.ETHA_DOWNLOAD_BASES.first())
-        assertEquals("https://${AppConfig.ETHA_SUB_HOST}/dl/", AppConfig.ETHA_DOWNLOAD_BASES[1])
+        assertEquals("https://fra.mobileiphone.org/dl/", AppConfig.ETHA_DOWNLOAD_BASES[1])   // where 1.1.5 and older look
+        assertTrue(AppConfig.ETHA_DOWNLOAD_BASES.none { it.contains("skyrayconfig") })         // the link-only domain has no /dl/
         assertEquals(AppConfig.ETHA_DOWNLOAD_BASES.first(), AppConfig.ETHA_DOWNLOAD_BASE)
         val old = AppConfig.ETHA_DOWNLOAD_BASES[1]
         assertEquals(old + "EthaVPN_1.1.0_arm64-v8a.apk",

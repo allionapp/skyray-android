@@ -185,6 +185,7 @@ object SubscriptionUpdater {
 
             LogUtil.i(AppConfig.TAG, "SubscriptionUpdater automatic update: ---${sub.subscription.remarks}")
             AngConfigManager.updateConfigViaSub(sub)
+            EthaSubscription.mergeDuplicates()   // this fetch may have moved the link onto another copy's address
 
             // Clear notification
             if (!quiet) NotificationHelper.cancel(NotificationChannelType.SUBSCRIPTION_UPDATE, applicationContext)

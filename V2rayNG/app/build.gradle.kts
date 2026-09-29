@@ -20,7 +20,11 @@ android {
         versionCode = 4000116
         versionName = "1.1.6"
         multiDexEnabled = true
-        manifestPlaceholders["subHost"] = "fra.mobileiphone.org"
+        // The App Links filter: every address our link has had (AppConfig.ETHA_SUB_HOSTS, current first);
+        // each serves /.well-known/assetlinks.json, as Android 11 and older verify all of them or none.
+        manifestPlaceholders["subHost"] = "fra.skyrayconfig.org"
+        manifestPlaceholders["subHost2"] = "fra.mobileiphonez.org"
+        manifestPlaceholders["subHost3"] = "fra.mobileiphone.org"
 
         val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';')
         splits {
