@@ -138,12 +138,11 @@ object AppConfig {
     const val ETHA_USER_AGENT = "SkyRay/${BuildConfig.VERSION_NAME} (android)"   // how the server knows this app fetched
     const val ETHA_SUB_UPDATE_MINUTES = 180L                 // = the API's Profile-Update-Interval: 3 h (the header wins after the first fetch)
     const val ETHA_SUB_STALE_MS = 3_600_000L                 // on open: refresh the subscription quietly when its last fetch is older than this
-    // The app's own updates (/dl/ on the service), not the link: the first host whose latest.json answers
-    // wins and the APK comes from that same host. mobileiphone.org is filtered in Iran; the old host stays
-    // second so a phone that can still reach only it keeps updating.
+    // The app's own updates (/dl/ on the service), not the link. Android direct downloads come from
+    // fra.mobileiphonez.org/dl/ only (mobileiphone.org is filtered in Iran): latest.json and the APK.
     const val ETHA_DL_HOST = "fra.mobileiphonez.org"
     const val ETHA_DOWNLOAD_BASE = "https://$ETHA_DL_HOST/dl/"
-    val ETHA_DOWNLOAD_BASES = listOf(ETHA_DOWNLOAD_BASE, "https://$ETHA_SUB_HOST/dl/")
+    val ETHA_DOWNLOAD_BASES = listOf(ETHA_DOWNLOAD_BASE)
     const val ETHA_BOT_URL = "https://t.me/Ethaconfigbot"
     const val ETHA_RENEW_URL = "$ETHA_BOT_URL?start=app_renew"
     const val ETHA_SUPPORT_URL = "$ETHA_BOT_URL?start=app_support"
