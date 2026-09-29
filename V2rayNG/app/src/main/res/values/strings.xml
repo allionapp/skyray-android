@@ -508,6 +508,9 @@
     <string name="etha_keep_line">Keep this server</string>
     <string name="etha_link_invalid">That is not an EthaVPN link</string>
     <string name="etha_link_added">Subscription added</string>
+    <string name="etha_preparing_title">Connecting…</string>
+    <string name="etha_preparing_hint">Getting your connection ready. A short ad plays, then you\'re connected.</string>
+    <string name="etha_preparing_hint_plain">Getting your connection ready.</string>
     <string name="etha_add_another_link">+ Add another link</string>
     <string name="etha_links_title">Your links</string>
     <string name="etha_link_remove">Remove this link</string>

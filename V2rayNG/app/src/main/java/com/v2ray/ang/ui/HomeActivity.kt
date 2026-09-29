@@ -40,6 +40,7 @@ import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -56,6 +57,7 @@ class HomeActivity : HelperBaseActivity() {
         const val EXTRA_TEST = "etha_test"          // Settings asked for a "test again"
         private const val CONNECT_GUARD_MS = 25_000L
         private const val TEST_GUARD_MS = 60_000L
+        private const val CONNECTING_SCREEN_MAX_MS = 90_000L
     }
 
     private val binding by lazy { ActivityHomeBinding.inflate(layoutInflater) }
@@ -68,12 +70,16 @@ class HomeActivity : HelperBaseActivity() {
     private var pendingConnect = false    // waiting for a real-delay batch to pick the line
     private var updateResult: CheckUpdateResult? = null
     private var rows: List<ServerPicker.Row> = emptyList()
+    private var progressJob: Job? = null   // the connecting screen's percentage while it is up
+    private var progress = 0f
+    private var progressCap = 0f
 
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (it.resultCode == RESULT_OK) {
             startCore()
         } else {
             connecting = false
+            hideConnecting()
             render()
         }
     }
@@ -124,15 +130,18 @@ class HomeActivity : HelperBaseActivity() {
             if (running && wasRunning == false) {
                 // The Play build's ad, over the tunnel and with the exit's locale (neutral until the
                 // probe names the country); the connection lasts only if it is watched through.
+                // The connecting screen stays up until the ad is on screen, or none will come.
+                raiseProgress(95f)
                 AdSignalOverride.apply(null)
-                AdsGate.showAfterConnect(this) {
+                AdsGate.showAfterConnect(this, onSkipped = {
                     CoreServiceManager.stopVService(this)
                     toastError(R.string.skyray_ad_required)
-                }
+                }, onReady = { finishConnecting() })
             }
             if (!running) {
                 AdsGate.onTunnelDown()
                 AdSignalOverride.restore()
+                if (!pendingConnect) hideConnecting()
             }
             wasRunning = running
         }
@@ -342,6 +351,7 @@ class HomeActivity : HelperBaseActivity() {
             return
         }
         connecting = true
+        showConnecting()
         val selectedOk = EthaSubscription.selectedIsIn(s.guid)
         when {
             isPinned() && selectedOk -> startVpnFlow()
@@ -376,6 +386,7 @@ class HomeActivity : HelperBaseActivity() {
                 ?: MmkvManager.decodeServerList(s.guid).firstOrNull()
             if (fallback == null) {
                 connecting = false
+                hideConnecting()
                 render()
                 toastError(R.string.etha_no_line)
                 return
@@ -387,6 +398,7 @@ class HomeActivity : HelperBaseActivity() {
     }
 
     private fun startVpnFlow() {
+        raiseProgress(55f)
         render()
         if (SettingsManager.isVpnMode()) {
             val intent = VpnService.prepare(this)
@@ -399,6 +411,7 @@ class HomeActivity : HelperBaseActivity() {
     private fun startCore() {
         if (MmkvManager.getSelectServer().isNullOrEmpty()) {
             connecting = false
+            hideConnecting()
             render()
             return
         }
@@ -415,9 +428,65 @@ class HomeActivity : HelperBaseActivity() {
             delay(CONNECT_GUARD_MS)
             if (connecting) {
                 connecting = false
+                hideConnecting()
                 render()
             }
         }
+    }
+
+    // ---------------------------------------------------------------- the connecting screen
+
+    /**
+     * Covers Home from the tap on Connect until the connection is ready to use: the best line
+     * is picked, the tunnel comes up, and the ad that comes first loads through it. The figure
+     * climbs toward the stage reached and never stops, so a slow step still shows movement.
+     */
+    private fun showConnecting() {
+        if (binding.overlayConnecting.isVisible) return
+        binding.tvConnectingHint.setText(if (AdsGate.SHOWS_ADS) R.string.etha_preparing_hint else R.string.etha_preparing_hint_plain)
+        binding.overlayConnecting.isVisible = true
+        progress = 0f
+        progressCap = 30f
+        showProgress()
+        progressJob?.cancel()
+        progressJob = lifecycleScope.launch {
+            var elapsed = 0L
+            while (true) {
+                delay(100)
+                elapsed += 100
+                progress += (progressCap - progress) * 0.05f
+                showProgress()
+                if (elapsed > CONNECTING_SCREEN_MAX_MS) { hideConnecting(); break }   // never a screen that stays
+            }
+        }
+    }
+
+    private fun raiseProgress(cap: Float) {
+        progressCap = maxOf(progressCap, cap)
+    }
+
+    private fun showProgress() {
+        val value = progress.toInt().coerceIn(0, 100)
+        binding.tvConnectingPercent.text = String.format(Locale.getDefault(), "%d%%", value)
+        binding.progressConnecting.setProgressCompat(value, true)
+    }
+
+    /** Ready: 100%, a moment to see it, and the screen goes. */
+    private fun finishConnecting() {
+        if (!binding.overlayConnecting.isVisible) return
+        progressJob?.cancel()
+        progress = 100f
+        showProgress()
+        progressJob = lifecycleScope.launch {
+            delay(300)
+            hideConnecting()
+        }
+    }
+
+    private fun hideConnecting() {
+        progressJob?.cancel()
+        progressJob = null
+        binding.overlayConnecting.isVisible = false
     }
 
     private fun restartCore() {

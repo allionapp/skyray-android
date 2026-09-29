@@ -39,8 +39,13 @@ object AdsGate {
     /** So a line that drops and reconnects does not bring an ad every time. */
     private const val MIN_INTERVAL_MILLIS = 20 * 60 * 1000L
 
-    /** How long after a connect an ad that arrives late is still shown. */
-    private const val SHOW_WINDOW_MILLIS = 60 * 1000L
+    /** How long the connecting screen waits for the ad once it has been requested. */
+    private const val LOAD_WAIT_MILLIS = 12 * 1000L
+
+    /** The longest it waits at all, the consent form included. */
+    private const val MAX_WAIT_MILLIS = 60 * 1000L
+
+    private val main = Handler(Looper.getMainLooper())
 
     /** AdMob's hashed ids of the team's phones, as the SDK prints them in logcat. */
     private val TEST_DEVICE_IDS = listOf(
@@ -55,34 +60,61 @@ object AdsGate {
     private var initialized = false
     private var lastShownAt = 0L
 
-    /** A connect that is still waiting for its ad: where to show it, and until when. */
+    /** A connect that is still waiting for its ad: where to show it, who to tell, and until when. */
     private var pending: Pending? = null
 
-    private class Pending(val activity: WeakReference<Activity>, val until: Long, val onSkipped: () -> Unit)
+    private class Pending(val activity: WeakReference<Activity>, val onSkipped: () -> Unit, val onReady: () -> Unit) {
+        var deadline = System.currentTimeMillis() + MAX_WAIT_MILLIS
+    }
 
     const val SHOWS_ADS = true
 
     /**
-     * Right after a fresh connect: shows the ad now if one is ready and the cooldown has passed,
-     * otherwise starts Google's side (consent, SDK, first request) over the tunnel and shows the
-     * ad when it arrives, within [SHOW_WINDOW_MILLIS]. [onSkipped] runs when it was shown but
-     * closed before the reward; nothing is reported when no ad could be shown.
+     * Right after a fresh connect, while the connecting screen is up: shows the ad now if one is
+     * ready and the cooldown has passed, otherwise starts Google's side (consent, SDK, request)
+     * over the tunnel and shows the ad when it arrives. [onReady] runs exactly once, when the ad
+     * goes on screen or when it is clear none will (cooldown, no fill, [LOAD_WAIT_MILLIS] passed):
+     * the connecting screen closes then. [onSkipped] runs when the ad was shown but closed before
+     * the reward.
      */
-    fun showAfterConnect(activity: Activity, onSkipped: () -> Unit) {
-        if (!TunnelSelf.ridesTunnel()) return
-        val now = System.currentTimeMillis()
-        if (now - lastShownAt < MIN_INTERVAL_MILLIS) return
-        if (ad != null) {
-            show(activity, onSkipped)
+    fun showAfterConnect(activity: Activity, onSkipped: () -> Unit, onReady: () -> Unit) {
+        val ready = once(onReady)
+        if (!TunnelSelf.ridesTunnel() || System.currentTimeMillis() - lastShownAt < MIN_INTERVAL_MILLIS) {
+            ready()
             return
         }
-        pending = Pending(WeakReference(activity), now + SHOW_WINDOW_MILLIS, onSkipped)
+        if (ad != null) {
+            show(activity, onSkipped, ready)
+            return
+        }
+        pending?.let { giveUp(it) }
+        val p = Pending(WeakReference(activity), onSkipped, ready)
+        pending = p
+        watchDeadline(p)
         if (initialized) load(activity.applicationContext) else startOverTunnel(activity)
     }
 
     /** The tunnel is down: nothing more goes to Google until the next connect. */
     fun onTunnelDown() {
-        pending = null
+        pending?.let { giveUp(it) }
+    }
+
+    private fun once(block: () -> Unit): () -> Unit {
+        var done = false
+        return { if (!done) { done = true; block() } }
+    }
+
+    private fun giveUp(p: Pending) {
+        if (pending === p) pending = null
+        p.onReady()
+    }
+
+    private fun watchDeadline(p: Pending) {
+        val wait = maxOf(0L, p.deadline - System.currentTimeMillis())
+        main.postDelayed({
+            if (pending !== p) return@postDelayed
+            if (System.currentTimeMillis() >= p.deadline) giveUp(p) else watchDeadline(p)
+        }, wait + 50)
     }
 
     private fun startOverTunnel(activity: Activity) {
@@ -104,6 +136,7 @@ object AdsGate {
         if (!TunnelSelf.ridesTunnel()) {
             // The tunnel went down during consent: the SDK starts with the next connect.
             consentStarted = false
+            pending?.let { giveUp(it) }
             return
         }
         // Debug builds get test ads, so development never makes impressions AdMob would count.
@@ -119,6 +152,11 @@ object AdsGate {
     private fun load(context: Context) {
         if (loading || ad != null || !TunnelSelf.ridesTunnel()) return
         loading = true
+        // From the request on, the connecting screen waits only so long for the answer.
+        pending?.let { p ->
+            p.deadline = minOf(p.deadline, System.currentTimeMillis() + LOAD_WAIT_MILLIS)
+            watchDeadline(p)
+        }
         RewardedInterstitialAd.load(
             context, UNIT_ID, AdRequest.Builder().build(),
             object : RewardedInterstitialAdLoadCallback() {
@@ -130,7 +168,7 @@ object AdsGate {
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     loading = false
-                    pending = null
+                    pending?.let { giveUp(it) }
                 }
             },
         )
@@ -140,15 +178,19 @@ object AdsGate {
     private fun showPending() {
         val p = pending ?: return
         pending = null
-        val activity = p.activity.get() ?: return
+        val activity = p.activity.get()
         val resumed = (activity as? LifecycleOwner)?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true
-        if (!TunnelSelf.ridesTunnel() || !resumed || activity.isFinishing || System.currentTimeMillis() > p.until) return
-        if (System.currentTimeMillis() - lastShownAt < MIN_INTERVAL_MILLIS) return
-        show(activity, p.onSkipped)
+        if (activity == null || !TunnelSelf.ridesTunnel() || !resumed || activity.isFinishing ||
+            System.currentTimeMillis() > p.deadline || System.currentTimeMillis() - lastShownAt < MIN_INTERVAL_MILLIS
+        ) {
+            p.onReady()
+            return
+        }
+        show(activity, p.onSkipped, p.onReady)
     }
 
-    private fun show(activity: Activity, onSkipped: () -> Unit) {
-        val ready = ad ?: return
+    private fun show(activity: Activity, onSkipped: () -> Unit, onReady: () -> Unit) {
+        val ready = ad ?: return onReady()
         lastShownAt = System.currentTimeMillis()
         val context = activity.applicationContext
         var earned = false
@@ -156,6 +198,7 @@ object AdsGate {
         ready.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdShowedFullScreenContent() {
                 MmkvManager.encodeSettings(AppConfig.PREF_SKYRAY_AD_SHOWN_AT, System.currentTimeMillis())
+                onReady()
             }
 
             // A tap opens the advertiser; that is the ad's own call to action, not walking out.
@@ -178,6 +221,7 @@ object AdsGate {
             override fun onAdFailedToShowFullScreenContent(error: AdError) {
                 MmkvManager.encodeSettings(AppConfig.PREF_SKYRAY_AD_SHOWN_AT, 0L)
                 ad = null
+                onReady()
                 load(context)
             }
         }
