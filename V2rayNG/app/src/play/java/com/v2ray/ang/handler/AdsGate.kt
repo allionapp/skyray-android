@@ -39,8 +39,10 @@ object AdsGate {
     /** So a line that drops and reconnects does not bring an ad every time. */
     private const val MIN_INTERVAL_MILLIS = 20 * 60 * 1000L
 
-    /** How long the connecting screen waits for the ad once it has been requested. */
+    /** How long the connecting screen waits for the ad once it has been requested; longer the
+     *  first time in a run, when the SDK itself is still starting (its configuration, then the ad). */
     private const val LOAD_WAIT_MILLIS = 12 * 1000L
+    private const val FIRST_LOAD_WAIT_MILLIS = 25 * 1000L
 
     /** The longest it waits at all, the consent form included. */
     private const val MAX_WAIT_MILLIS = 60 * 1000L
@@ -59,6 +61,7 @@ object AdsGate {
     private var consentStarted = false
     private var initialized = false
     private var lastShownAt = 0L
+    private var requestedBefore = false
 
     /** A connect that is still waiting for its ad: where to show it, who to tell, and until when. */
     private var pending: Pending? = null
@@ -153,8 +156,10 @@ object AdsGate {
         if (loading || ad != null || !TunnelSelf.ridesTunnel()) return
         loading = true
         // From the request on, the connecting screen waits only so long for the answer.
+        val wait = if (requestedBefore) LOAD_WAIT_MILLIS else FIRST_LOAD_WAIT_MILLIS
+        requestedBefore = true
         pending?.let { p ->
-            p.deadline = minOf(p.deadline, System.currentTimeMillis() + LOAD_WAIT_MILLIS)
+            p.deadline = minOf(p.deadline, System.currentTimeMillis() + wait)
             watchDeadline(p)
         }
         RewardedInterstitialAd.load(
