@@ -3,6 +3,7 @@ package com.v2ray.ang.handler
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.os.LocaleList
 import com.v2ray.ang.AngApplication
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.util.LogUtil
@@ -26,6 +27,7 @@ import java.util.TimeZone
  */
 object AdSignalOverride {
     private var savedLocale: Locale? = null
+    private var savedLocales: LocaleList? = null
     private var savedTimeZone: TimeZone? = null
 
     /** The locale in force while the override is on; null when it is off. */
@@ -64,12 +66,13 @@ object AdSignalOverride {
         if (!TunnelSelf.ridesTunnel()) return
         if (current == null) {
             savedLocale = Locale.getDefault()
+            savedLocales = LocaleList.getDefault()
             savedTimeZone = TimeZone.getDefault()
             watchForTunnelEnd()
         }
         val (locale, zone) = geo(country)
         current = locale
-        Locale.setDefault(locale)
+        setLocale(locale)
         TimeZone.setDefault(TimeZone.getTimeZone(zone))
         LogUtil.i(AppConfig.TAG, "AdSignalOverride: $locale / $zone")
     }
@@ -81,7 +84,17 @@ object AdSignalOverride {
 
     /** Something reset the process locale (a new screen's context): put the exit's back. */
     fun reassert() {
-        current?.let { Locale.setDefault(it) }
+        current?.let { setLocale(it) }
+    }
+
+    /**
+     * The whole language list, not only its first entry: the ad's WebView sends the list as its
+     * Accept-Language, and a list that still went on with the device's own languages would carry
+     * them along behind the exit's.
+     */
+    private fun setLocale(locale: Locale) {
+        LocaleList.setDefault(LocaleList(locale))
+        Locale.setDefault(locale)
     }
 
     /**
@@ -120,8 +133,10 @@ object AdSignalOverride {
     @Synchronized
     fun restore() {
         if (current == null) return
+        savedLocales?.let { LocaleList.setDefault(it) }
         savedLocale?.let { Locale.setDefault(it) }
         savedTimeZone?.let { TimeZone.setDefault(it) }
+        savedLocales = null
         savedLocale = null
         savedTimeZone = null
         current = null

@@ -224,7 +224,7 @@ class CoreVpnService : VpnService(), ServiceControl {
             isRunning = true
             // Before the core starts: every socket it dials stays out of this tunnel.
             TunnelSelf.vpnService = this
-            TunnelSelf.installProtector(this)
+            TunnelSelf.installProtector()
             return true
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to establish VPN interface", e)
@@ -318,9 +318,9 @@ class CoreVpnService : VpnService(), ServiceControl {
     private fun configurePerAppProxy(builder: Builder) {
         val selfPackageName = BuildConfig.APPLICATION_ID
         // The Play build keeps the app inside its own tunnel (see TunnelSelf): the core's sockets
-        // are protected instead, and the test process binds its sockets past the VPN (allowBypass).
+        // are protected instead. The VPN stays non-bypassable, so no other app — Google Play
+        // services among them — can bind its way around it to the real network.
         val selfInside = TunnelSelf.wanted
-        if (selfInside) builder.allowBypass()
 
         // If per-app proxy is not enabled, disallow the VPN service's own package and return
         if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PER_APP_PROXY) == false) {

@@ -1,13 +1,9 @@
 package com.v2ray.ang.handler
 
-import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.VpnService
-import android.os.ParcelFileDescriptor
 import com.v2ray.ang.AngApplication
-import com.v2ray.ang.AppConfig
-import com.v2ray.ang.util.LogUtil
 import libv2ray.Libv2ray
 import libv2ray.SocketProtector
 
@@ -18,8 +14,7 @@ import libv2ray.SocketProtector
  * they serve; the price is that everything else the app sends — the ad SDK's requests among
  * it — leaves on the real network, from the user's real address. The Play build instead keeps
  * the app inside the tunnel, like any other app on the phone, and exempts only the core's own
- * sockets: with VpnService.protect() while the service runs, else by binding them to the
- * underlying network, which the VPN allows for that (allowBypass).
+ * sockets, with VpnService.protect(). The VPN is not bypassable: no app can go around it.
  */
 object TunnelSelf {
     /** The build that shows ads keeps the app inside its tunnel; the direct build is unchanged. */
@@ -47,38 +42,17 @@ object TunnelSelf {
     private var installed = false
 
     /**
-     * Keeps every socket the core dials in this process out of the tunnel: through the running
-     * VPN service's protect(), or — with no service here, e.g. a delay test right after it
-     * stopped — by binding the socket to the underlying network. With no VPN up at all the
-     * socket is left alone, so a test when disconnected behaves as it always did.
+     * Keeps every socket the core dials out of the tunnel, through the running VPN service's
+     * protect(). The delay tests run in the same process as the VPN service, so they are covered
+     * too. With no VPN service here the socket is left alone: then there is no tunnel of ours for
+     * it to loop into.
      */
     @Synchronized
-    fun installProtector(context: Context) {
+    fun installProtector() {
         if (!wanted || installed) return
         installed = true
-        val cm = context.applicationContext.getSystemService(ConnectivityManager::class.java)
         Libv2ray.registerSocketProtector(object : SocketProtector {
-            override fun protect(fd: Long): Boolean {
-                vpnService?.let { if (it.protect(fd.toInt())) return true }
-                return cm == null || bindPastVpn(cm, fd.toInt())
-            }
+            override fun protect(fd: Long): Boolean = vpnService?.protect(fd.toInt()) ?: true
         })
-    }
-
-    private fun bindPastVpn(cm: ConnectivityManager, fd: Int): Boolean {
-        val networks = cm.allNetworks.mapNotNull { n -> cm.getNetworkCapabilities(n)?.let { n to it } }
-        if (networks.none { it.second.hasTransport(NetworkCapabilities.TRANSPORT_VPN) }) return true
-        val underlying = networks.filter { (_, caps) ->
-            !caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
-                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        }.sortedByDescending { it.second.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) }
-            .firstOrNull()?.first ?: return false
-        return try {
-            ParcelFileDescriptor.fromFd(fd).use { underlying.bindSocket(it.fileDescriptor) }
-            true
-        } catch (e: Exception) {
-            LogUtil.w(AppConfig.TAG, "TunnelSelf: could not bind a socket past the VPN: ${e.message}")
-            false
-        }
     }
 }
