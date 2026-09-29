@@ -128,8 +128,9 @@ object AppConfig {
     const val TG_CHANNEL_URL = "https://t.me/vpnandfree"
 
     /** EthaVPN: the service this build (the SkyRay app) is made for. Its links come from any of these
-     *  hosts, all the same service (mobileiphone.org is filtered in Iran, so newer links use the others).
-     *  The App Links filter in AndroidManifest.xml lists the same hosts. */
+     *  hosts, all the same service, oldest first: mobileiphone.org is filtered in Iran; mobileiphonez.org
+     *  is the CDN-fronted domain (also the app's downloads); skyrayconfig.org serves only the links and
+     *  is where an account ends up. The App Links filter in AndroidManifest.xml lists the same hosts. */
     const val ETHA_SUB_HOST = "fra.mobileiphone.org"
     val ETHA_SUB_HOSTS = listOf(ETHA_SUB_HOST, "fra.mobileiphonez.org", "fra.skyrayconfig.org")
     const val ETHA_SUB_PATH = "/sub/"

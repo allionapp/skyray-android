@@ -75,6 +75,29 @@ object EthaSubscription {
         return token.length >= 8 && token.none { it == '/' }
     }
 
+    /** The account an EthaVPN link names: its /sub/<token> path, the same on every host of the service. null for any other link. */
+    fun accountOf(link: String?): String? {
+        val bare = link?.substringBefore('#')?.trim() ?: return null
+        return if (isSubLink(bare)) URI(bare).path else null
+    }
+
+    /** Whether two links name the same account: the same link (its fragment aside), or one EthaVPN account on any of its hosts. */
+    fun sameAccount(a: String?, b: String?): Boolean {
+        val bareA = a?.substringBefore('#')?.trim().orEmpty()
+        val bareB = b?.substringBefore('#')?.trim().orEmpty()
+        if (bareA.isEmpty() || bareB.isEmpty()) return false
+        return bareA == bareB || accountOf(bareA)?.let { it == accountOf(bareB) } == true
+    }
+
+    /**
+     * A link's host among ETHA_SUB_HOSTS: later ones are newer, and an account never moves back to
+     * an older one (the first is filtered in Iran). -1 for any other host.
+     */
+    fun hostRank(link: String?): Int {
+        val host = try { URI(link?.substringBefore('#')?.trim() ?: return -1).host } catch (_: Exception) { null } ?: return -1
+        return AppConfig.ETHA_SUB_HOSTS.indexOfFirst { it.equals(host, ignoreCase = true) }
+    }
+
     /** The link inside pasted text (a Telegram message adds words and punctuation around it). */
     fun extractSubLink(text: String?): String? =
         text?.split(Regex("\\s+"))
@@ -126,6 +149,43 @@ object EthaSubscription {
     fun findByLink(link: String): SubscriptionCache? {
         val bare = link.substringBefore('#').trim()
         return MmkvManager.decodeSubscriptions().firstOrNull { it.subscription.url.substringBefore('#').trim() == bare }
+    }
+
+    /**
+     * The link one account is stored under already when [link] names an older address of it (an
+     * old bot message in Telegram): Home tries that one first. null otherwise.
+     */
+    fun newerStored(link: String): String? {
+        val account = accountOf(link) ?: return null
+        val rank = hostRank(link)
+        return all().map { it.subscription.url }
+            .filter { accountOf(it) == account && hostRank(it) > rank }
+            .maxByOrNull { hostRank(it) }
+    }
+
+    /**
+     * The same account on another of the service's hosts (the bot hands out a newer address once
+     * the old one is filtered): the stored link moves to [named] instead of a second copy of the
+     * account appearing. Returns the subscription's id and the link it had, so a move the new
+     * address does not answer can be undone with [setLink]; null when nothing moved. An older
+     * address gets here only when the newer stored one did not work ([newerStored]).
+     */
+    fun moveToHost(named: String): Pair<String, String>? {
+        val account = accountOf(named) ?: return null
+        val bare = named.substringBefore('#').trim()
+        val subs = MmkvManager.decodeSubscriptions()
+        if (subs.any { it.subscription.url.substringBefore('#').trim() == bare }) return null   // this very link is here already
+        // Only a link in use (enabled): a disabled one is never refreshed, so the move would always read "not working".
+        val same = subs.firstOrNull { it.subscription.enabled && accountOf(it.subscription.url) == account } ?: return null
+        val old = same.subscription.url
+        setLink(same.guid, named)
+        return same.guid to old
+    }
+
+    fun setLink(subId: String, url: String) {
+        val item = MmkvManager.decodeSubscription(subId) ?: return
+        item.url = url
+        MmkvManager.encodeSubscription(subId, item)
     }
 
     /** The name a link goes by in the list: the API's title, else its remark. */

@@ -223,7 +223,7 @@ class HomeActivity : HelperBaseActivity() {
         val text = try { Utils.getClipboard(this) } catch (_: Exception) { "" }
         if (text.isBlank() || text == "null") return false
         val link = EthaSubscription.extractSubLink(text) ?: return true
-        if (link == clipboardTried || link == MmkvManager.decodeSettingsString(AppConfig.PREF_ETHA_DELETED_LINK)) return true
+        if (link == clipboardTried || EthaSubscription.sameAccount(link, MmkvManager.decodeSettingsString(AppConfig.PREF_ETHA_DELETED_LINK))) return true
         clipboardTried = link
         LogUtil.i(AppConfig.TAG, "A link on the clipboard, importing")
         importLink(link)
@@ -579,15 +579,26 @@ class HomeActivity : HelperBaseActivity() {
     }
 
     /** Adds the subscription (or refreshes it when it is already there), shows it and connects. */
-    private fun importLink(raw: String) {
-        val link = EthaSubscription.extractSubLink(raw) ?: raw
+    private fun importLink(raw: String, preferStored: Boolean = true, keepAt: String? = null) {
+        val pasted = EthaSubscription.extractSubLink(raw) ?: raw
+        // An older address of an account stored under a newer one (an old message in Telegram): the
+        // newer one is tried first, so the account does not go back to a filtered host. If that one
+        // does not work, the address given is tried after all (below).
+        val link = (if (preferStored) EthaSubscription.newerStored(pasted) else null) ?: pasted
         MmkvManager.encodeSettings(AppConfig.PREF_ETHA_DELETED_LINK, "")   // asked for by hand: no longer "deleted"
         val named = if (link.contains('#')) link else "$link#${AppConfig.ETHA_SUB_NAME}"
         val before = MmkvManager.decodeSubscriptions().map { it.guid }.toSet()
         val shownBefore = sub?.guid
         showLoading()
         lifecycleScope.launch(Dispatchers.IO) {
-            val (count, countSub) = try {
+            // keepAt: the filtered first host only lends its answer. The stored link is never
+            // pointed at it, not even for the fetch: that goes through a copy with its address.
+            val kept = keepAt?.let { EthaSubscription.findByLink(it) }
+            // The same account from another of the service's addresses: its stored link moves to
+            // this one and is refreshed from it below (and moves back if this address does not answer).
+            val moved = if (kept == null) EthaSubscription.moveToHost(named) else null
+            if (moved != null) LogUtil.i(AppConfig.TAG, "The same account on another address: the link moves there")
+            val (count, countSub) = if (kept != null) 0 to 0 else try {
                 AngConfigManager.importBatchConfig(named, "", false)
             } catch (e: Exception) {
                 LogUtil.e(AppConfig.TAG, "Failed to import the link", e)
@@ -599,7 +610,9 @@ class HomeActivity : HelperBaseActivity() {
             var fetched = true
             if (count + countSub == 0) {
                 fetched = try {
-                    EthaSubscription.findByLink(link)?.let { AngConfigManager.updateConfigViaSub(it).successCount > 0 } ?: false
+                    val source = kept?.let { SubscriptionCache(it.guid, it.subscription.copy(url = named)) }
+                        ?: EthaSubscription.findByLink(link)
+                    source?.let { AngConfigManager.updateConfigViaSub(it).successCount > 0 } ?: false
                 } catch (e: Exception) {
                     LogUtil.e(AppConfig.TAG, "Failed to refresh", e)
                     false
@@ -607,7 +620,7 @@ class HomeActivity : HelperBaseActivity() {
             }
             // The link just added (or found again) is the one Home shows from now on.
             val added = MmkvManager.decodeSubscriptions().firstOrNull { it.guid !in before }
-            val target = added ?: EthaSubscription.findByLink(link)
+            val target = added ?: kept ?: EthaSubscription.findByLink(link)
             val targetServers = target?.let { MmkvManager.decodeServerList(it.guid) }.orEmpty()
             val works = fetched && targetServers.isNotEmpty()
             if (target != null && works) {
@@ -616,6 +629,17 @@ class HomeActivity : HelperBaseActivity() {
                 // A new link that brought no servers is not kept: it must not push aside one that
                 // works, and adding it again later starts clean.
                 EthaSubscription.remove(added.guid)
+            }
+            if (!works && moved != null) EthaSubscription.setLink(moved.first, moved.second)   // back to the address that worked
+            if (!works && link != pasted) {
+                // The newer stored address did not work: the one given is tried after all. The account
+                // moves there, except onto the first host, filtered in Iran: that one only lends its answer.
+                val lendOnly = EthaSubscription.hostRank(pasted) == 0
+                withContext(Dispatchers.Main) {
+                    hideLoading()
+                    importLink(pasted, preferStored = false, keepAt = if (lendOnly) link else null)
+                }
+                return@launch
             }
             withContext(Dispatchers.Main) {
                 hideLoading()

@@ -99,6 +99,42 @@ class EthaSubscriptionTest {
         assertFalse(EthaSubscription.isSubLink("https://evil-fra.skyrayconfig.org/sub/0123456789abcdef"))
     }
 
+    @Test
+    fun oneAccountOnEveryHost() {
+        val account = EthaSubscription.accountOf("https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN")
+        assertEquals("/sub/0123456789abcdef", account)
+        assertEquals(account, EthaSubscription.accountOf("https://fra.skyrayconfig.org/sub/0123456789abcdef"))
+        assertEquals(account, EthaSubscription.accountOf("https://FRA.MOBILEIPHONEZ.ORG/sub/0123456789abcdef#My line"))
+        assertFalse(account == EthaSubscription.accountOf("https://fra.skyrayconfig.org/sub/0123456789abcdeX"))
+        assertNull(EthaSubscription.accountOf("https://evil.example/sub/0123456789abcdef"))
+        assertNull(EthaSubscription.accountOf("https://fra.skyrayconfig.org/dl/latest.json"))
+        assertNull(EthaSubscription.accountOf(null))
+    }
+
+    /** "Delete account" remembers the link it deleted; the clipboard must not bring the account back from any host. */
+    @Test
+    fun theDeletedAccountIsKnownOnEveryHost() {
+        val deleted = "https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN"
+        assertTrue(EthaSubscription.sameAccount("https://fra.mobileiphone.org/sub/0123456789abcdef", deleted))
+        assertTrue(EthaSubscription.sameAccount("https://fra.skyrayconfig.org/sub/0123456789abcdef", deleted))
+        assertFalse(EthaSubscription.sameAccount("https://fra.skyrayconfig.org/sub/0123456789abcdeX", deleted))
+        assertTrue(EthaSubscription.sameAccount("https://other.example/s/1#a", "https://other.example/s/1"))
+        assertFalse(EthaSubscription.sameAccount("https://fra.skyrayconfig.org/sub/0123456789abcdef", ""))
+        assertFalse(EthaSubscription.sameAccount(null, deleted))
+    }
+
+    /** Later hosts are newer: an account never moves back to fra.mobileiphone.org, which is filtered in Iran. */
+    @Test
+    fun theFilteredHostRanksLowest() {
+        val old = EthaSubscription.hostRank("https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN")
+        val z = EthaSubscription.hostRank("https://fra.mobileiphonez.org/sub/0123456789abcdef")
+        val config = EthaSubscription.hostRank("https://FRA.SKYRAYCONFIG.ORG/sub/0123456789abcdef")
+        assertEquals(0, old)
+        assertTrue(old < z && z < config)
+        assertEquals(-1, EthaSubscription.hostRank("https://evil.example/sub/0123456789abcdef"))
+        assertEquals(-1, EthaSubscription.hostRank(null))
+    }
+
     /** The App Links filter opens the app for the same hosts the app accepts a link from. */
     @Test
     fun appLinksCoverEveryHost() {

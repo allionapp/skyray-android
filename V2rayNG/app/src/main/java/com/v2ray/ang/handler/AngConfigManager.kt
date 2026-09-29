@@ -594,7 +594,17 @@ object AngConfigManager {
                 // The account card: days and data left, a notice, the support link — from the
                 // response headers. A header that is missing or broken leaves the profile alone.
                 EthaSubscription.applyHeaders(it.subscription, response.headers)
-                MmkvManager.encodeSubscription(it.guid, it.subscription)
+                // Written onto the link as stored now, not the copy this fetch started from: while it
+                // ran, Home may have moved the link to another of the service's addresses (the same
+                // account from a newer host), and the old copy would move it back. A link removed
+                // meanwhile stays removed, and the servers this fetch just wrote for it go too.
+                val stored = MmkvManager.decodeSubscription(it.guid) ?: run {
+                    MmkvManager.removeServerViaSubid(it.guid)
+                    return SubscriptionUpdateResult(skipCount = 1)
+                }
+                stored.lastUpdated = it.subscription.lastUpdated
+                EthaSubscription.applyHeaders(stored, response.headers)
+                MmkvManager.encodeSubscription(it.guid, stored)
                 LogUtil.i(AppConfig.TAG, "Subscription updated: ${it.subscription.remarks}, $count configs")
                 return SubscriptionUpdateResult(
                     configCount = count,
