@@ -14,6 +14,16 @@ class UpdateCheckerManagerTest {
     private val latest = LatestRelease(version = "1.1.0", versionCode = 110, minSupported = "1.0.5", notes = "faster", assets = listOf(arm, uni))
 
     @Test
+    fun downloadsComeFromTheNewHostFirstAndTheApkFromTheHostThatAnswered() {
+        assertEquals("https://fra.mobileiphonez.org/dl/", AppConfig.ETHA_DOWNLOAD_BASES.first())
+        assertEquals("https://${AppConfig.ETHA_SUB_HOST}/dl/", AppConfig.ETHA_DOWNLOAD_BASES[1])
+        assertEquals(AppConfig.ETHA_DOWNLOAD_BASES.first(), AppConfig.ETHA_DOWNLOAD_BASE)
+        val old = AppConfig.ETHA_DOWNLOAD_BASES[1]
+        assertEquals(old + "EthaVPN_1.1.0_arm64-v8a.apk",
+            UpdateCheckerManager.evaluate(latest, "1.0.0", listOf("arm64-v8a"), old)!!.downloadUrl)
+    }
+
+    @Test
     fun versionCompare() {
         assertTrue(UpdateCheckerManager.compareVersions("1.1.0", "1.0.9") > 0)
         assertTrue(UpdateCheckerManager.compareVersions("1.0.0", "1.0.0") == 0)

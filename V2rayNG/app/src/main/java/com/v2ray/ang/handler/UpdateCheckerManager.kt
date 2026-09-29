@@ -15,10 +15,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Where a new version comes from. First the service's own `/dl/latest.json` (the host the
- * subscription link lives on, reachable wherever the link is — direct, then through the local
- * proxy when the tunnel is up), which names the APK per ABI with its sha256 so the app can
- * verify what it installs. GitHub's releases API is the fallback only.
+ * Where a new version comes from. First the service's own `/dl/latest.json` (each of
+ * `AppConfig.ETHA_DOWNLOAD_BASES` in order — direct, then through the local proxy when the tunnel is
+ * up — and the APK from the host that answered), which names the APK per ABI with its sha256 so the
+ * app can verify what it installs. GitHub's releases API is the fallback only.
  */
 object UpdateCheckerManager {
 
@@ -43,13 +43,17 @@ object UpdateCheckerManager {
     }
 
     private fun fromLatestJson(): CheckUpdateResult? {
-        val text = fetch(AppConfig.ETHA_LATEST_URL) ?: return null
-        val latest = JsonUtil.fromJsonSafe(text, LatestRelease::class.java) ?: return null
-        return evaluate(latest, BuildConfig.VERSION_NAME, Build.SUPPORTED_ABIS.toList())
+        for (base in AppConfig.ETHA_DOWNLOAD_BASES) {
+            val text = fetch("${base}latest.json") ?: continue
+            val latest = JsonUtil.fromJsonSafe(text, LatestRelease::class.java) ?: continue
+            return evaluate(latest, BuildConfig.VERSION_NAME, Build.SUPPORTED_ABIS.toList(), base)
+        }
+        return null
     }
 
-    /** Pure: what latest.json means for a running version on a device with these ABIs (null = unusable file). */
-    fun evaluate(latest: LatestRelease, currentVersion: String, abis: List<String>): CheckUpdateResult? {
+    /** Pure: what latest.json (read from `base`) means for a running version on a device with these ABIs (null = unusable file). */
+    fun evaluate(latest: LatestRelease, currentVersion: String, abis: List<String>,
+                 base: String = AppConfig.ETHA_DOWNLOAD_BASE): CheckUpdateResult? {
         if (latest.version.isBlank() || latest.assets.isEmpty()) return null
         if (compareVersions(latest.version, currentVersion) <= 0) return CheckUpdateResult(hasUpdate = false)
         val asset = pickAsset(latest.assets, abis) ?: return null
@@ -58,7 +62,7 @@ object UpdateCheckerManager {
             hasUpdate = true,
             latestVersion = latest.version,
             releaseNotes = latest.notes.orEmpty(),
-            downloadUrl = AppConfig.ETHA_DOWNLOAD_BASE + asset.name,
+            downloadUrl = base + asset.name,
             sha256 = asset.sha256.lowercase(),
             fileName = asset.name,
             size = asset.size,
