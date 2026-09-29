@@ -15,8 +15,7 @@ android {
 
     defaultConfig {
         // EthaVPN: its own id (both apps can be installed side by side); the code keeps the
-        // upstream namespace so the fork stays a small diff. subHost = the link's host, for
-        // the App Links filter in the manifest (https://<subHost>/sub/<token> opens the app).
+        // upstream namespace so the fork stays a small diff.
         applicationId = "com.allion.skyray"   // the id registered on Google Play (and the App Store bundle id)
         minSdk = 24
         targetSdk = 37
@@ -25,7 +24,6 @@ android {
         versionCode = 4000121
         versionName = "1.2.1"
         multiDexEnabled = true
-        manifestPlaceholders["subHost"] = "fra.mobileiphone.org"
 
         val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';')
         splits {

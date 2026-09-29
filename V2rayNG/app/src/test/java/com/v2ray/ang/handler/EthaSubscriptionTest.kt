@@ -7,6 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class EthaSubscriptionTest {
 
@@ -85,6 +86,27 @@ class EthaSubscriptionTest {
         assertFalse(EthaSubscription.isSubLink("vless://x"))
         assertFalse(EthaSubscription.isSubLink(null))
         assertFalse(EthaSubscription.isSubLink("not a url at all ://"))
+    }
+
+    @Test
+    fun everyHostOfTheServiceIsALink() {
+        for (host in listOf("fra.mobileiphone.org", "fra.mobileiphonez.org", "fra.skyrayconfig.org")) {
+            assertTrue(host, EthaSubscription.isSubLink("https://$host/sub/0123456789abcdef"))
+            assertEquals("https://$host/sub/0123456789abcdef",
+                EthaSubscription.extractSubLink("🔗 Your link:\nhttps://$host/sub/0123456789abcdef\n"))
+        }
+        assertFalse(EthaSubscription.isSubLink("https://skyrayconfig.org.evil.example/sub/0123456789abcdef"))
+        assertFalse(EthaSubscription.isSubLink("https://evil-fra.skyrayconfig.org/sub/0123456789abcdef"))
+    }
+
+    /** The App Links filter opens the app for the same hosts the app accepts a link from. */
+    @Test
+    fun appLinksCoverEveryHost() {
+        val manifest = File("src/main/AndroidManifest.xml").readText()
+        val filter = manifest.substringAfter("android:autoVerify=\"true\"").substringBefore("</intent-filter>")
+        val hosts = Regex("android:host=\"([^\"]+)\"").findAll(filter).map { it.groupValues[1] }.toSet()
+        assertEquals(AppConfig.ETHA_SUB_HOSTS.toSet(), hosts)
+        assertTrue(filter.contains("android:pathPrefix=\"${AppConfig.ETHA_SUB_PATH}\""))
     }
 
     @Test

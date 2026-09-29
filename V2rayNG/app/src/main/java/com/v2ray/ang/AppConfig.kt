@@ -127,9 +127,11 @@ object AppConfig {
     const val UPSTREAM_URL = "$GITHUB_URL/2dust/v2rayNG"
     const val TG_CHANNEL_URL = "https://t.me/vpnandfree"
 
-    /** EthaVPN: the service this build (the SkyRay app) is made for. */
+    /** EthaVPN: the service this build (the SkyRay app) is made for. Its links come from any of these
+     *  hosts, all the same service (mobileiphone.org is filtered in Iran, so newer links use the others).
+     *  The App Links filter in AndroidManifest.xml lists the same hosts. */
     const val ETHA_SUB_HOST = "fra.mobileiphone.org"
-    val ETHA_SUB_HOSTS = listOf(ETHA_SUB_HOST)
+    val ETHA_SUB_HOSTS = listOf(ETHA_SUB_HOST, "fra.mobileiphonez.org", "fra.skyrayconfig.org")
     const val ETHA_SUB_PATH = "/sub/"
     const val ETHA_SUB_NAME = "EthaVPN"
     const val ETHA_USER_AGENT = "SkyRay/${BuildConfig.VERSION_NAME} (android)"   // how the server knows this app fetched
