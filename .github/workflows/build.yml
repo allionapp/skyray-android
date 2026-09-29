@@ -149,12 +149,14 @@ jobs:
           mv "$f.rotated" "$f"
           # Android 7-8 (API 24-27) must see the Ethavpn key, Android 9+ the Allion key with the proof.
           # (Output read into variables first: `| grep -q` under pipefail can fail a good build on SIGPIPE.)
-          OLD_SDK=$($AS verify --min-sdk-version 24 --max-sdk-version 27 --print-certs "$f" | tr 'A-F' 'a-f')
-          NEW_SDK=$($AS verify --min-sdk-version 28 --print-certs "$f" | tr 'A-F' 'a-f')
-          PROOF=$($AS lineage --in "$f" --print-certs | tr 'A-F' 'a-f')
-          [[ "$OLD_SDK" == *"sha-256 digest: $OLD"* ]] || { echo "::error::$f: Android 7-8 do not see the Ethavpn key"; exit 1; }
-          [[ "$NEW_SDK" == *"sha-256 digest: $NEW"* ]] || { echo "::error::$f: Android 9+ do not see the Allion key"; exit 1; }
-          [[ "$PROOF" == *"$OLD"* && "$PROOF" == *"$NEW"* ]] || { echo "::error::$f: the rotation proof is missing a key"; exit 1; }
+          OLD_SDK=$($AS verify --min-sdk-version 24 --max-sdk-version 27 --print-certs "$f" | tr '[:upper:]' '[:lower:]')
+          NEW_SDK=$($AS verify --min-sdk-version 28 --print-certs "$f" | tr '[:upper:]' '[:lower:]')
+          PROOF=$($AS lineage --in "$f" --print-certs | tr '[:upper:]' '[:lower:]')
+          # on failure the annotation carries apksigner's certificate lines (public; the job log needs a login)
+          digests() { printf '%s' "$1" | grep 'sha-256 digest' | sed -E 's/certificate //' | tr '\n' ';' || true; }
+          [[ "$OLD_SDK" == *"sha-256 digest: $OLD"* ]] || { echo "::error::$(basename "$f"): Android 7-8 do not see the Ethavpn key; apksigner: $(digests "$OLD_SDK")"; exit 1; }
+          [[ "$NEW_SDK" == *"sha-256 digest: $NEW"* ]] || { echo "::error::$(basename "$f"): Android 9+ do not see the Allion key; apksigner: $(digests "$NEW_SDK")"; exit 1; }
+          [[ "$PROOF" == *"$OLD"* && "$PROOF" == *"$NEW"* ]] || { echo "::error::$(basename "$f"): the rotation proof is missing a key; apksigner: $(digests "$PROOF")"; exit 1; }
         done
         echo "direct APKs: Ethavpn for Android 7-8, Allion (rotated from Ethavpn) for Android 9+"
 
