@@ -484,6 +484,7 @@
     <string name="etha_keep_line">همین سرور بماند</string>
     <string name="etha_link_invalid">این لینک EthaVPN نیست</string>
     <string name="etha_link_added">اشتراک اضافه شد</string>
+    <string name="etha_link_not_working">این لینک خوانده نشد. شاید دیگر معتبر نباشد؛ برای لینک جدید با پشتیبانی تماس بگیرید.</string>
     <string name="etha_preparing_title">در حال اتصال…</string>
     <string name="etha_preparing_hint">اتصال شما در حال آماده شدن است. یک تبلیغ کوتاه پخش می‌شود و بعد وصل می‌شوید.</string>
     <string name="etha_preparing_hint_plain">اتصال شما در حال آماده شدن است.</string>

@@ -592,18 +592,28 @@ class HomeActivity : HelperBaseActivity() {
                 LogUtil.e(AppConfig.TAG, "Failed to import the link", e)
                 0 to 0
             }
+            // The same link again (a renewal, a reinstall): refresh it instead of failing, and judge
+            // it by that fetch. Its old servers alone are no proof: a link the server no longer
+            // knows would otherwise read "added" and connect to lines that are gone.
+            var fetched = true
             if (count + countSub == 0) {
-                // The same link again (a renewal, a reinstall): refresh instead of failing.
-                try { AngConfigManager.updateConfigViaSubAll() } catch (e: Exception) { LogUtil.e(AppConfig.TAG, "Failed to refresh", e) }
+                fetched = try {
+                    EthaSubscription.findByLink(link)?.let { AngConfigManager.updateConfigViaSub(it).successCount > 0 } ?: false
+                } catch (e: Exception) {
+                    LogUtil.e(AppConfig.TAG, "Failed to refresh", e)
+                    false
+                }
             }
             // The link just added (or found again) is the one Home shows from now on.
             val added = MmkvManager.decodeSubscriptions().firstOrNull { it.guid !in before }
             val target = added ?: EthaSubscription.findByLink(link)
             val targetServers = target?.let { MmkvManager.decodeServerList(it.guid) }.orEmpty()
-            if (target != null && targetServers.isNotEmpty()) {
+            val works = fetched && targetServers.isNotEmpty()
+            if (target != null && works) {
                 EthaSubscription.setActive(target.guid)
-            } else if (added != null && shownBefore != null) {
-                // A new link that brought no servers must not push aside the one that works.
+            } else if (added != null) {
+                // A new link that brought no servers is not kept: it must not push aside one that
+                // works, and adding it again later starts clean.
                 EthaSubscription.remove(added.guid)
             }
             withContext(Dispatchers.Main) {
@@ -611,8 +621,8 @@ class HomeActivity : HelperBaseActivity() {
                 refreshSubscription()
                 render()
                 SubscriptionUpdater.sync(forceReschedule = true)   // the background refresh, timed from this fetch
-                if (targetServers.isEmpty()) {
-                    toastError(R.string.import_subscription_failure)
+                if (!works) {
+                    toastError(R.string.etha_link_not_working)
                 } else {
                     toastSuccess(R.string.etha_link_added)
                     if (shownBefore != null && sub?.guid != shownBefore) {
