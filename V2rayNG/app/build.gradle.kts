@@ -1,10 +1,36 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("com.jaredsburrows.license")
 }
 
+// The Play bundle is signed with SkyRay's upload key — the key Google Play knows, the same the owner
+// signs with — whenever its settings file is present: V2rayNG/keystore.properties, or the file named
+// by -Pskyray.keystore=<path>. Keys: storeFile (next to that file), storePassword, keyAlias,
+// keyPassword. Neither file is ever in git. The direct APKs stay with the developer's key (their
+// CI), so a direct update keeps installing over the one people already have.
+val uploadKeyFile: File? = ((findProperty("skyray.keystore") as String?)?.let { file(it) }
+    ?: rootProject.file("keystore.properties")).takeIf { it.exists() }
+val uploadKey: Properties? = uploadKeyFile?.let { f -> Properties().apply { f.inputStream().use { load(it) } } }
+
 android {
+    signingConfigs {
+        if (uploadKey != null) {
+            create("upload") {
+                val store = uploadKey.getProperty("storeFile")
+                // Next to the settings file; app/ too, where the owner's older project keeps it.
+                storeFile = listOf(File(store), File(uploadKeyFile!!.parentFile, store), File(uploadKeyFile.parentFile, "app/$store"))
+                    .firstOrNull { it.isAbsolute && it.exists() }
+                    ?: error("SkyRay upload key: $store not found next to $uploadKeyFile")
+                storePassword = uploadKey.getProperty("storePassword")
+                keyAlias = uploadKey.getProperty("keyAlias")
+                keyPassword = uploadKey.getProperty("keyPassword")
+            }
+        }
+    }
+
     // Only the languages the app itself is translated into. Libraries bring dozens more, and
     // Google Play refuses a bundle whose "he" it cannot handle for translation.
     androidResources {
@@ -69,6 +95,7 @@ android {
         create("play") {
             dimension = "distribution"
             buildConfigField("String", "DISTRIBUTION", "\"Play\"")
+            if (uploadKey != null) signingConfig = signingConfigs.getByName("upload")
         }
     }
 

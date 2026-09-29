@@ -25,8 +25,9 @@ V2rayNG/local.properties
 *.apk
 *.aar
 
-# Ignore signing properties
+# Ignore signing properties (SkyRay's upload key settings and the key itself: never in git)
 signing.properties
+keystore.properties
 
 # Ignore shared object files
 *.so
