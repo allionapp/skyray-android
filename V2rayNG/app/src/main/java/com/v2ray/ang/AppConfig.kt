@@ -128,13 +128,15 @@ object AppConfig {
     const val TG_CHANNEL_URL = "https://t.me/vpnandfree"
 
     /**
-     * EthaVPN: the service this build (the SkyRay app) is made for. Our link's addresses, the current one
-     * first (fra.skyrayconfig.org since 2026-09-29, a link-only domain); the older two answer the same links.
-     * A phone on an older one moves to the service's current address by itself: every fetch names it in
-     * Profile-Web-Page-Url (EthaSubscription.adoptedUrl). The tunnels' address comes from the subscription.
+     * EthaVPN: the service this build (the SkyRay app) is made for. Its links come from one address only,
+     * fra.skyrayconfig.org (a link-only domain, since 2026-09-29). A link on an earlier address
+     * (ETHA_OLD_SUB_HOSTS) is never used as is: it becomes https://fra.skyrayconfig.org/sub/<the same token>
+     * (EthaSubscription.migratedUrl) — the phone's stored link on first open or its next refresh, and a
+     * pasted, scanned or tapped one before it is saved. The tunnels' address comes from the subscription.
      */
     const val ETHA_SUB_HOST = "fra.skyrayconfig.org"
-    val ETHA_SUB_HOSTS = listOf(ETHA_SUB_HOST, "fra.mobileiphonez.org", "fra.mobileiphone.org")
+    val ETHA_SUB_HOSTS = listOf(ETHA_SUB_HOST)
+    val ETHA_OLD_SUB_HOSTS = listOf("fra.mobileiphonez.org", "fra.mobileiphone.org")
     const val ETHA_SUB_PATH = "/sub/"
     const val ETHA_SUB_NAME = "EthaVPN"
     const val ETHA_USER_AGENT = "SkyRay/${BuildConfig.VERSION_NAME} (android)"   // how the server knows this app fetched

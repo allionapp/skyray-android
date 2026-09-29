@@ -540,6 +540,12 @@ object AngConfigManager {
                 return SubscriptionUpdateResult(skipCount = 1)
             }
 
+            // A link on an earlier EthaVPN address: fetch, and keep, the current one (the same account).
+            EthaSubscription.migratedUrl(it.subscription.url)?.let { next ->
+                LogUtil.i(AppConfig.TAG, "Subscription moves to the current link address")
+                it.subscription.url = next
+                MmkvManager.encodeSubscription(it.guid, it.subscription)
+            }
             val url = HttpUtil.toIdnUrl(it.subscription.url)
             if (!Utils.isValidUrl(url)) {
                 return SubscriptionUpdateResult(failureCount = 1)
@@ -594,12 +600,6 @@ object AngConfigManager {
                 // The account card: days and data left, a notice, the support link — from the
                 // response headers. A header that is missing or broken leaves the profile alone.
                 EthaSubscription.applyHeaders(it.subscription, response.headers)
-                // The service names its current link address in Profile-Web-Page-Url: a phone still on an
-                // older one moves to it by itself (same token, listed addresses only).
-                EthaSubscription.adoptedUrl(it.subscription.url, it.subscription.webPageUrl)?.let { next ->
-                    LogUtil.i(AppConfig.TAG, "Subscription moves to the service's current link address")
-                    it.subscription.url = next
-                }
                 MmkvManager.encodeSubscription(it.guid, it.subscription)
                 LogUtil.i(AppConfig.TAG, "Subscription updated: ${it.subscription.remarks}, $count configs")
                 return SubscriptionUpdateResult(
@@ -641,24 +641,17 @@ object AngConfigManager {
      * @param url The URL.
      * @return The number of subscriptions imported.
      */
-    private fun importUrlAsSubscription(url: String): Int {
+    private fun importUrlAsSubscription(given: String): Int {
+        val url = EthaSubscription.migratedUrl(given) ?: given   // an earlier EthaVPN address: the current one
         val subscriptions = MmkvManager.decodeSubscriptions()
         subscriptions.forEach {
             if (it.subscription.url == url) {
                 return 0
             }
         }
-        // The same account on another of our addresses (the new link after a move, or an old one tapped
-        // again): no second copy; the subscription keeps the newer address.
-        EthaSubscription.tokenOf(url)?.let { token ->
-            subscriptions.firstOrNull { EthaSubscription.tokenOf(it.subscription.url) == token }?.let { same ->
-                val keep = EthaSubscription.better(same.subscription.url, url)
-                if (keep != same.subscription.url) {
-                    same.subscription.url = keep
-                    MmkvManager.encodeSubscription(same.guid, same.subscription)
-                }
-                return 0
-            }
+        // The same account already there (another name after '#', or the old address): no second copy.
+        if (EthaSubscription.isSubLink(url) && subscriptions.any { EthaSubscription.sameAccount(it.subscription.url, url) }) {
+            return 0
         }
         val uri = URI(Utils.fixIllegalUrl(url))
         val subItem = SubscriptionItem()

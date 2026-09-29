@@ -88,56 +88,45 @@ class EthaSubscriptionTest {
     }
 
     @Test
-    fun everyLinkAddressIsOursTheCurrentOneFirst() {
-        assertEquals(listOf("fra.skyrayconfig.org", "fra.mobileiphonez.org", "fra.mobileiphone.org"), AppConfig.ETHA_SUB_HOSTS)
+    fun linksComeFromFraSkyrayconfigOnly() {
+        assertEquals(listOf("fra.skyrayconfig.org"), AppConfig.ETHA_SUB_HOSTS)
         assertEquals("fra.skyrayconfig.org", AppConfig.ETHA_SUB_HOST)
-        AppConfig.ETHA_SUB_HOSTS.forEachIndexed { i, h ->
-            assertTrue(h, EthaSubscription.isSubLink("https://$h/sub/XXXXXXXXXXXXXX"))
-            assertEquals(i, EthaSubscription.hostRank("https://$h/sub/XXXXXXXXXXXXXX"))
+        assertTrue(EthaSubscription.isSubLink("https://fra.skyrayconfig.org/sub/XXXXXXXXXXXXXX"))
+        // the earlier addresses, the tunnels' address, the bare domain and look-alikes are not a link
+        for (h in listOf("fra.mobileiphonez.org", "fra.mobileiphone.org", "api.mobileiphonez.org", "mobileiphonez.org",
+                         "fra.skyrayconfig.org.evil.example", "skyrayconfig.org")) {
+            assertFalse(h, EthaSubscription.isSubLink("https://$h/sub/0123456789abcdef"))
         }
-        // the tunnels' address, the bare domain and look-alikes are not a link address
-        assertFalse(EthaSubscription.isSubLink("https://api.mobileiphonez.org/sub/0123456789abcdef"))
-        assertFalse(EthaSubscription.isSubLink("https://mobileiphonez.org/sub/0123456789abcdef"))
-        assertFalse(EthaSubscription.isSubLink("https://fra.skyrayconfig.org.evil.example/sub/0123456789abcdef"))
         assertFalse(EthaSubscription.isSubLink("https://evil.example/fra.skyrayconfig.org/sub/0123456789abcdef"))
-        assertEquals(-1, EthaSubscription.hostRank("https://evil.example/sub/0123456789abcdef"))
-        assertEquals(-1, EthaSubscription.hostRank(null))
-    }
-
-    @Test
-    fun theTokenIsWhatStaysWhenTheAddressMoves() {
-        assertEquals("0123456789abcdef", EthaSubscription.tokenOf("https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN"))
-        assertEquals("0123456789abcdef", EthaSubscription.tokenOf("https://fra.skyrayconfig.org/sub/0123456789abcdef"))
-        assertNull(EthaSubscription.tokenOf("https://evil.example/sub/0123456789abcdef"))
+        assertEquals("0123456789abcdef", EthaSubscription.tokenOf("https://fra.skyrayconfig.org/sub/0123456789abcdef#EthaVPN"))
+        assertNull(EthaSubscription.tokenOf("https://fra.mobileiphone.org/sub/0123456789abcdef"))
         assertNull(EthaSubscription.tokenOf(null))
     }
 
     @Test
-    fun aPhoneMovesToTheAddressTheServiceNames() {
-        val old = "https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN"
-        val header = "https://fra.skyrayconfig.org/sub/0123456789abcdef"
-        assertEquals("$header#EthaVPN", EthaSubscription.adoptedUrl(old, header))            // moves, keeps its name
-        assertEquals(header, EthaSubscription.adoptedUrl("https://fra.mobileiphone.org/sub/0123456789abcdef", header))
-        assertNull(EthaSubscription.adoptedUrl("$header#EthaVPN", header))                   // already there
-        assertNull(EthaSubscription.adoptedUrl(old, "https://fra.skyrayconfig.org/sub/fedcba9876543210"))   // another account
-        assertNull(EthaSubscription.adoptedUrl(old, "https://evil.example/sub/0123456789abcdef"))          // never an unlisted host
-        assertNull(EthaSubscription.adoptedUrl(old, null))
-        assertNull(EthaSubscription.adoptedUrl("https://some.other/sub/0123456789abcdef", header))        // not our link: left alone
-        // a later move works the same way: an older listed address to the first one
-        assertEquals("https://fra.skyrayconfig.org/sub/0123456789abcdef#x",
-            EthaSubscription.adoptedUrl("https://fra.mobileiphonez.org/sub/0123456789abcdef#x", header))
+    fun anEarlierAddressBecomesFraSkyrayconfigWithTheSameToken() {
+        assertEquals("https://fra.skyrayconfig.org/sub/0123456789abcdef#EthaVPN",
+            EthaSubscription.migratedUrl("https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN"))
+        assertEquals("https://fra.skyrayconfig.org/sub/0123456789abcdef",
+            EthaSubscription.migratedUrl("https://FRA.MOBILEIPHONEZ.ORG/sub/0123456789abcdef"))
+        assertNull(EthaSubscription.migratedUrl("https://fra.skyrayconfig.org/sub/0123456789abcdef"))   // already there
+        assertNull(EthaSubscription.migratedUrl("https://api.mobileiphonez.org/sub/0123456789abcdef"))  // never a link address
+        assertNull(EthaSubscription.migratedUrl("https://fra.mobileiphone.org/dl/latest.json"))
+        assertNull(EthaSubscription.migratedUrl("https://fra.mobileiphone.org/sub/abc"))
+        assertNull(EthaSubscription.migratedUrl("http://fra.mobileiphone.org/sub/0123456789abcdef"))
+        assertNull(EthaSubscription.migratedUrl("https://evil.example/sub/0123456789abcdef"))
+        assertNull(EthaSubscription.migratedUrl(null))
     }
 
     @Test
-    fun ofTwoCopiesTheNewerAddressIsKept() {
-        val old = "https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN"
-        val mid = "https://fra.mobileiphonez.org/sub/0123456789abcdef#EthaVPN"
-        val new = "https://fra.skyrayconfig.org/sub/0123456789abcdef#EthaVPN"
-        assertEquals(new, EthaSubscription.better(old, new))
-        assertEquals(new, EthaSubscription.better(new, old))
-        assertEquals(mid, EthaSubscription.better(old, mid))
-        assertEquals(new, EthaSubscription.better("https://some.other/sub/0123456789abcdef", new))
-        assertEquals(old, EthaSubscription.better(old, "https://some.other/sub/0123456789abcdef"))
+    fun oneAccountWhateverTheAddressOrName() {
+        val new = "https://fra.skyrayconfig.org/sub/0123456789abcdef"
+        assertTrue(EthaSubscription.sameAccount(new, "$new#EthaVPN"))
+        assertTrue(EthaSubscription.sameAccount("https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN", new))
+        assertFalse(EthaSubscription.sameAccount(new, "https://fra.skyrayconfig.org/sub/fedcba9876543210"))
+        assertFalse(EthaSubscription.sameAccount(new, "https://evil.example/sub/0123456789abcdef"))
+        assertFalse(EthaSubscription.sameAccount(new, ""))
+        assertFalse(EthaSubscription.sameAccount(null, null))
     }
 
     @Test
@@ -149,6 +138,9 @@ class EthaSubscriptionTest {
         assertEquals(link, EthaSubscription.extractSubLink(link))
         val newLink = "https://fra.skyrayconfig.org/sub/XXXXXXXXXXXXXX"
         assertEquals(newLink, EthaSubscription.extractSubLink("👇 Tap the link below, or the button.\n$newLink"))
+        // a message with an earlier address gives the link on the current one
+        assertEquals(newLink, EthaSubscription.extractSubLink("🔗 https://fra.mobileiphone.org/sub/XXXXXXXXXXXXXX."))
+        assertNull(EthaSubscription.extractSubLink("https://api.mobileiphonez.org/sub/XXXXXXXXXXXXXX"))
         assertNull(EthaSubscription.extractSubLink("nothing here"))
         assertNull(EthaSubscription.extractSubLink(null))
     }

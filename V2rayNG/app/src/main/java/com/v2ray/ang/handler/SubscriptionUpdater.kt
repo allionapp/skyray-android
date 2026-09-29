@@ -173,7 +173,7 @@ object SubscriptionUpdater {
 
             val sub = SubscriptionCache(subId, subItem)
             // EthaVPN's own link refreshes every few hours: no notification each time.
-            val quiet = EthaSubscription.isSubLink(subItem.url)
+            val quiet = EthaSubscription.isSubLink(subItem.url) || EthaSubscription.migratedUrl(subItem.url) != null
 
             // Notify about update start
             if (!quiet) NotificationHelper.notify(

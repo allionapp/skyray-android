@@ -17,14 +17,10 @@ android {
         targetSdk = 37
         // 4000000 + the build number: the same code in every ABI split and in the Play bundle, so a
         // phone can move between the direct APK and the Play install (the updater compares versionName).
-        versionCode = 4000116
-        versionName = "1.1.6"
+        versionCode = 4000122
+        versionName = "1.2.2"
         multiDexEnabled = true
-        // The App Links filter: every address our link has had (AppConfig.ETHA_SUB_HOSTS, current first);
-        // each serves /.well-known/assetlinks.json, as Android 11 and older verify all of them or none.
-        manifestPlaceholders["subHost"] = "fra.skyrayconfig.org"
-        manifestPlaceholders["subHost2"] = "fra.mobileiphonez.org"
-        manifestPlaceholders["subHost3"] = "fra.mobileiphone.org"
+        manifestPlaceholders["subHost"] = "fra.skyrayconfig.org"   // AppConfig.ETHA_SUB_HOST: the only link address
 
         val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';')
         splits {

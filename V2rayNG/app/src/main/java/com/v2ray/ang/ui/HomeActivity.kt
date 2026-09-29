@@ -184,7 +184,8 @@ class HomeActivity : HelperBaseActivity() {
         val text = try { Utils.getClipboard(this) } catch (_: Exception) { "" }
         if (text.isBlank() || text == "null") return false
         val link = EthaSubscription.extractSubLink(text) ?: return true
-        if (link == clipboardTried || link == MmkvManager.decodeSettingsString(AppConfig.PREF_ETHA_DELETED_LINK)) return true
+        // by account, not by text: the deleted link was stored with its "#EthaVPN" name and maybe an old address
+        if (link == clipboardTried || EthaSubscription.sameAccount(link, MmkvManager.decodeSettingsString(AppConfig.PREF_ETHA_DELETED_LINK))) return true
         clipboardTried = link
         LogUtil.i(AppConfig.TAG, "A link on the clipboard, importing")
         importLink(link)
@@ -194,7 +195,7 @@ class HomeActivity : HelperBaseActivity() {
     // ---------------------------------------------------------------- state
 
     private fun refreshSubscription() {
-        EthaSubscription.mergeDuplicates()   // the old and the new link of one account: one subscription
+        EthaSubscription.migrateAll()   // links on an earlier address → fra.skyrayconfig.org; one subscription per account
         sub = EthaSubscription.find()
         mainViewModel.subscriptionIdChanged(sub?.guid ?: "")
     }
