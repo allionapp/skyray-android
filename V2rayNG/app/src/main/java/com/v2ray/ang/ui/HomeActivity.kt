@@ -103,6 +103,7 @@ class HomeActivity : HelperBaseActivity() {
         binding.btnScan.setOnClickListener { scanLink() }
         binding.btnRefresh.setOnClickListener { refreshServers() }
         binding.btnAddLink.setOnClickListener { addAnotherLink() }
+        binding.btnRemoveLink.setOnClickListener { confirmRemoveLink() }   // also in "Your links"; here in plain sight
         binding.tvSubName.setOnClickListener { showLinks() }
         binding.btnRenew.setOnClickListener { Utils.openUri(this, AppConfig.ETHA_RENEW_URL) }
         // Google Play takes payment for digital services through its own billing only, so the

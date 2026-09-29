@@ -243,6 +243,15 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="@font/vazirmatn"
                     android:text="@string/etha_add_another_link" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_remove_link"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/vazirmatn"
+                    android:text="@string/etha_link_remove"
+                    android:textColor="?attr/colorError" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
