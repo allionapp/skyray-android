@@ -516,6 +516,9 @@
     <string name="etha_send_logs">ارسال گزارش به پشتیبانی</string>
     <string name="etha_send_logs_hint">فقط وقتی پشتیبانی بخواهد</string>
     <string name="etha_privacy_policy">حریم خصوصی</string>
+    <string name="etha_privacy_choices">انتخاب‌های حریم خصوصی</string>
+    <string name="etha_privacy_choices_hint">تغییر رضایتی که برای تبلیغات داده‌اید</string>
+    <string name="etha_privacy_choices_connect">اول وصل شوید، بعد «انتخاب‌های حریم خصوصی» را باز کنید.</string>
     <string name="etha_delete_account">حذف حساب</string>
     <string name="etha_delete_account_hint">اشتراک و همه‌ی اطلاعات آن از این گوشی پاک می‌شود</string>
     <string name="etha_delete_account_confirm">اشتراک، سرورها و همه‌ی اطلاعات حساب از این گوشی پاک می‌شود. لینک شما در تلگرام همچنان کار می‌کند و هر وقت خواستید دوباره اضافه می‌شود.</string>

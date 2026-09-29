@@ -18,6 +18,7 @@ import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAdLoa
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.UserMessagingPlatform
 import com.v2ray.ang.AppConfig
+import com.v2ray.ang.util.LogUtil
 import java.lang.ref.WeakReference
 
 /**
@@ -97,6 +98,17 @@ object AdsGate {
         if (initialized) load(activity.applicationContext) else startOverTunnel(activity)
     }
 
+    /** Whether Google asks for a way to change consent later (Settings shows "Privacy choices"). */
+    fun privacyChoicesRequired(context: Context): Boolean =
+        UserMessagingPlatform.getConsentInformation(context).privacyOptionsRequirementStatus ==
+            com.google.android.ump.ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED
+
+    /** Settings' "Privacy choices": Google's form to change consent, over the tunnel only. */
+    fun showPrivacyChoices(activity: Activity, done: (Boolean) -> Unit) {
+        if (!TunnelSelf.ridesTunnel()) return done(false)
+        UserMessagingPlatform.showPrivacyOptionsForm(activity) { error -> done(error == null) }
+    }
+
     /** The tunnel is down: nothing more goes to Google until the next connect. */
     fun onTunnelDown() {
         main.post { pending?.let { giveUp(it) } }   // may come from the network thread; the screen is the main thread's
@@ -130,14 +142,40 @@ object AdsGate {
         consent.requestConsentInfoUpdate(
             activity,
             ConsentRequestParameters.Builder().build(),
-            { UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { initialize(appContext) } },
-            { initialize(appContext) },
+            {
+                // The tunnel went down meanwhile: no form over the real network; the next
+                // connect asks again.
+                if (!TunnelSelf.ridesTunnel()) {
+                    consentStarted = false
+                    pending?.let { giveUp(it) }
+                } else {
+                    consentLookedUp = true
+                    UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { initialize(appContext) }
+                }
+            },
+            { error ->
+                // Consent could not be looked up: whether ads may be requested is unknown, and
+                // the request goes on as before.
+                consentLookedUp = false
+                LogUtil.w(AppConfig.TAG, "AdsGate: consent info failed: ${error.message}")
+                initialize(appContext)
+            },
         )
     }
+
+    /** Whether consent was looked up this run (then canRequestAds() is the answer). */
+    private var consentLookedUp = false
 
     private fun initialize(context: Context) {
         if (!TunnelSelf.ridesTunnel()) {
             // The tunnel went down during consent: the SDK starts with the next connect.
+            consentStarted = false
+            pending?.let { giveUp(it) }
+            return
+        }
+        // Consent was looked up and does not allow ad requests (the user said no): none, and
+        // consent is asked again with the next connect.
+        if (consentLookedUp && !UserMessagingPlatform.getConsentInformation(context).canRequestAds()) {
             consentStarted = false
             pending?.let { giveUp(it) }
             return

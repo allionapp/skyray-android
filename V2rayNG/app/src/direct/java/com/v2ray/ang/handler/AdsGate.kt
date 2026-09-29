@@ -9,4 +9,8 @@ object AdsGate {
     fun showAfterConnect(activity: Activity, onSkipped: () -> Unit, onReady: () -> Unit) = onReady()
 
     fun onTunnelDown() = Unit
+
+    fun privacyChoicesRequired(context: android.content.Context) = false
+
+    fun showPrivacyChoices(activity: Activity, done: (Boolean) -> Unit) = done(false)
 }

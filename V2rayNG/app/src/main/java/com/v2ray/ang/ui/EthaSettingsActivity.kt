@@ -9,6 +9,8 @@ import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityEthaSettingsBinding
 import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.extension.toastSuccess
+import com.v2ray.ang.extension.toast
+import com.v2ray.ang.handler.AdsGate
 import com.v2ray.ang.handler.EthaSubscription
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.Updates
@@ -43,6 +45,11 @@ class EthaSettingsActivity : BaseActivity() {
         binding.layoutLogs.setOnClickListener { startActivity(Intent(this, LogcatActivity::class.java)) }
         binding.layoutAbout.setOnClickListener { startActivity(Intent(this, AboutActivity::class.java)) }
         binding.layoutPrivacy.setOnClickListener { Utils.openUri(this, AppConfig.ETHA_PRIVACY_URL) }
+        // Google's consent can be changed here any time (asked for by its EU rules); over the
+        // tunnel only, like everything of Google's.
+        binding.layoutPrivacyChoices.setOnClickListener {
+            AdsGate.showPrivacyChoices(this) { shown -> if (!shown) toast(R.string.etha_privacy_choices_connect) }
+        }
         binding.layoutDelete.setOnClickListener { confirmDelete() }
         binding.layoutAdvanced.setOnClickListener { startActivity(Intent(this, MainActivity::class.java)) }
     }
@@ -50,6 +57,7 @@ class EthaSettingsActivity : BaseActivity() {
     override fun onResume() {
         super.onResume()
         binding.layoutAdvanced.isVisible = MmkvManager.decodeSettingsBool(AppConfig.PREF_ETHA_EXPERT, false)
+        binding.layoutPrivacyChoices.isVisible = AdsGate.privacyChoicesRequired(this)
         binding.tvServerValue.text = ServerPicker.currentLabel(this, MmkvManager.decodeSettingsBool(AppConfig.PREF_ETHA_PINNED, false))
         val codes = resources.getStringArray(R.array.language_select_value)
         val names = resources.getStringArray(R.array.language_select)

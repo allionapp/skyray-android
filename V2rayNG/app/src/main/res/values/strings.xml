@@ -540,6 +540,9 @@
     <string name="etha_send_logs">Send logs to support</string>
     <string name="etha_send_logs_hint">Only when support asks for it</string>
     <string name="etha_privacy_policy">Privacy policy</string>
+    <string name="etha_privacy_choices">Privacy choices</string>
+    <string name="etha_privacy_choices_hint">Change what you agreed to for ads</string>
+    <string name="etha_privacy_choices_connect">Connect first, then open Privacy choices.</string>
     <string name="etha_delete_account">Delete account</string>
     <string name="etha_delete_account_hint">Removes your subscription and all its data from this phone</string>
     <string name="etha_delete_account_confirm">Your subscription, its servers and all account data are removed from this phone. Your link in Telegram keeps working, so you can add it again any time.</string>
