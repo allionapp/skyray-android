@@ -96,7 +96,7 @@ object AdsGate {
 
     /** The tunnel is down: nothing more goes to Google until the next connect. */
     fun onTunnelDown() {
-        pending?.let { giveUp(it) }
+        main.post { pending?.let { giveUp(it) } }   // may come from the network thread; the screen is the main thread's
     }
 
     private fun once(block: () -> Unit): () -> Unit {

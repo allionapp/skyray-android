@@ -132,7 +132,7 @@ class HomeActivity : HelperBaseActivity() {
                 // probe names the country); the connection lasts only if it is watched through.
                 // The connecting screen stays up until the ad is on screen, or none will come.
                 raiseProgress(95f)
-                AdSignalOverride.apply(null)
+                AdSignalOverride.ensure()   // usually on already, from the network watch
                 AdsGate.showAfterConnect(this, onSkipped = {
                     CoreServiceManager.stopVService(this)
                     toastError(R.string.skyray_ad_required)
@@ -140,7 +140,6 @@ class HomeActivity : HelperBaseActivity() {
             }
             if (!running) {
                 AdsGate.onTunnelDown()
-                AdSignalOverride.restore()
                 if (!pendingConnect) hideConnecting()
             }
             wasRunning = running
@@ -176,6 +175,8 @@ class HomeActivity : HelperBaseActivity() {
                 render()
             }
         }
+        // The exit's locale while the VPN carries this app, the device's otherwise.
+        AdSignalOverride.watch()
         mainViewModel.startListenBroadcast()
         mainViewModel.initAssets(assets)
         SubscriptionUpdater.sync()

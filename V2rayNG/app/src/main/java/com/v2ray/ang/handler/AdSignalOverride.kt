@@ -26,9 +26,6 @@ import java.util.TimeZone
  * cannot change; it is left alone, as is everything about the request that is not location.
  */
 object AdSignalOverride {
-    private var savedLocale: Locale? = null
-    private var savedLocales: LocaleList? = null
-    private var savedTimeZone: TimeZone? = null
 
     /** The locale in force while the override is on; null when it is off. */
     @Volatile
@@ -64,17 +61,17 @@ object AdSignalOverride {
     @Synchronized
     fun apply(country: String?) {
         if (!TunnelSelf.ridesTunnel()) return
-        if (current == null) {
-            savedLocale = Locale.getDefault()
-            savedLocales = LocaleList.getDefault()
-            savedTimeZone = TimeZone.getDefault()
-            watchForTunnelEnd()
-        }
         val (locale, zone) = geo(country)
         current = locale
         setLocale(locale)
         TimeZone.setDefault(TimeZone.getTimeZone(zone))
         LogUtil.i(AppConfig.TAG, "AdSignalOverride: $locale / $zone")
+    }
+
+    /** On with neutral values unless it is on already (then the exit's country, if known, stays). */
+    @Synchronized
+    fun ensure() {
+        if (current == null) apply(null)
     }
 
     /** Refines to the exit country once the probe knows it; nothing when the override is off. */
@@ -83,6 +80,7 @@ object AdSignalOverride {
     }
 
     /** Something reset the process locale (a new screen's context): put the exit's back. */
+    @Synchronized
     fun reassert() {
         current?.let { setLocale(it) }
     }
@@ -97,49 +95,63 @@ object AdSignalOverride {
         Locale.setDefault(locale)
     }
 
+    private var watching = false
+
     /**
-     * However the tunnel ends — Disconnect, the notification, the tunnel process dying — this
-     * process's default network stops being the VPN; the device's values come back right then,
-     * and nothing more goes to Google until the next connect.
+     * Follows this process's default network for as long as the process lives: the moment it is
+     * the VPN, the exit's values apply (neutral until the probe names the country); the moment it
+     * is not — Disconnect, the notification, a reconnect to another line, the tunnel process
+     * dying — the device's values come back and nothing more goes to Google. The network is the
+     * ground truth; the app's own connected/disconnected messages can cross in a fast reconnect.
+     * Call once, early, from the main process; later calls do nothing.
      */
-    private fun watchForTunnelEnd() {
+    @Synchronized
+    fun watch() {
+        if (watching || !TunnelSelf.wanted) return
         val cm = try {
             AngApplication.application.getSystemService(ConnectivityManager::class.java)
         } catch (_: Exception) {
             null
         } ?: return
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) end(this)
-            }
-
-            override fun onLost(network: Network) = end(this)
-
-            private fun end(cb: ConnectivityManager.NetworkCallback) {
-                if (TunnelSelf.ridesTunnel()) return
-                restore()
-                AdsGate.onTunnelDown()
-                try { cm.unregisterNetworkCallback(cb) } catch (_: Exception) {}
-            }
-        }
         try {
-            cm.registerDefaultNetworkCallback(callback)
+            cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+                override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                    if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+                        ensure()
+                    } else {
+                        tunnelEnded()
+                    }
+                }
+
+                override fun onLost(network: Network) {
+                    if (!TunnelSelf.ridesTunnel()) tunnelEnded()
+                }
+            })
+            watching = true
         } catch (e: Exception) {
             LogUtil.w(AppConfig.TAG, "AdSignalOverride: no network watch: ${e.message}")
         }
     }
 
-    /** The device's own values back. Nothing when the override is off. */
+    private fun tunnelEnded() {
+        restore()
+        AdsGate.onTunnelDown()
+    }
+
+    /**
+     * The device's own values back. Nothing when the override is off. They come from their
+     * source, not from a copy taken at the start: a reconnect within a second could otherwise
+     * take its copy while the exit's values were still in force, and "restore" those.
+     */
     @Synchronized
     fun restore() {
         if (current == null) return
-        savedLocales?.let { LocaleList.setDefault(it) }
-        savedLocale?.let { Locale.setDefault(it) }
-        savedTimeZone?.let { TimeZone.setDefault(it) }
-        savedLocales = null
-        savedLocale = null
-        savedTimeZone = null
         current = null
+        // As a screen of the app sets them: the app's language (the device's, unless the user chose one).
+        val own = SettingsManager.getLocale()
+        LocaleList.setDefault(LocaleList(own))
+        Locale.setDefault(own)
+        TimeZone.setDefault(null)   // the next read takes the system's zone again
         LogUtil.i(AppConfig.TAG, "AdSignalOverride: restored ${Locale.getDefault()} / ${TimeZone.getDefault().id}")
     }
 }
