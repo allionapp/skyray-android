@@ -1,1 +1,1 @@
-The Google Play edition (same app, updates through Play). Nothing changes for the direct download.
+Updates now come from the new address (fra.mobileiphonez.org/dl/), with the old one as a fallback. Nothing else changes.
