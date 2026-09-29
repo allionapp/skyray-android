@@ -19,8 +19,10 @@
    Publish the fingerprint in the channel once; the server pins it (`/etc/ethavpn-app.fpr`).
 3. **Repository secrets** (Settings → Secrets and variables → Actions): `APP_KEYSTORE_BASE64`
    (the .b64 file's content), `APP_KEYSTORE_PASSWORD`, `APP_KEYSTORE_ALIAS` (`ethavpn`),
-   `APP_KEY_PASSWORD`, `GPG_PRIVATE_KEY` (the armored secret key), and `GPG_PASSPHRASE` when the
-   GPG key has one (leave it out for a key without a passphrase).
+   `APP_KEY_PASSWORD`, the Allion LLC keystore as `ALLION_KEYSTORE_BASE64`, `ALLION_KEYSTORE_PASSWORD`,
+   `ALLION_KEY_ALIAS` (`skyray`), `ALLION_KEY_PASSWORD` (see **Signing keys** below), `GPG_PRIVATE_KEY`
+   (the armored secret key), and `GPG_PASSPHRASE` when the GPG key has one (leave it out for a key
+   without a passphrase).
 4. **Deploy key** for the server's working copy (`/opt/ethavpn-app`, remote `github`), like the
    other three repos: `ssh-keygen -t ed25519 -f /root/.ssh/gh-ethavpn-app -N ''`, add the public
    key as a deploy key with write access, alias `gh-ethavpn-app` in `/root/.ssh/config`.
@@ -43,14 +45,35 @@
 4. On the server: `ethavpn-app-publish vX.Y.Z` (verifies the signatures against the pinned key
    and every sha256, installs under `/var/www/html/dl/`, prints the channel post). The bot picks
    the new APK up by itself; phones learn about it within a day.
-5. First release only: put `signing-cert-sha256.txt`'s value into
-   `/var/www/html/.well-known/assetlinks.json` (App Links) — see the server runbook
-   (`/opt/staging/app-launch/APPLY.md`, step 5).
+5. `signing-cert-sha256.txt` has two lines, the Ethavpn and the Allion certificate (see **Signing keys**):
+   both must be in `/var/www/html/.well-known/assetlinks.json` (App Links), with Play's App signing key —
+   see the server runbook (`/opt/staging/app-launch/APPLY.md`, step 5).
+
+## Signing keys
+
+- **Allion LLC key** (`ALLION_*`, alias `skyray`, SHA-256 `71:74:BB:CD:…:6B:36:53`): signs the Play bundle
+  (Google Play's upload key) and is the direct APKs' signer on Android 9+.
+- **Ethavpn key** (`APP_KEYSTORE_*`, SHA-256 `F7:CB:08:E1:…:23:F6:FC`): signed every direct APK up to 1.1.9.
+  Phones that have one of those accept an update only from the same key, so the build **rotates**: `apksigner
+  rotate` writes the proof that the Ethavpn key hands over to the Allion key, and every direct APK is
+  re-signed with `--next-signer` (Allion), `--lineage` and `--rotation-min-sdk-version 28`. Android 9+
+  updates in place and trusts the Allion key from then on; Android 7–8 (API 24–27) cannot rotate and keep
+  seeing the Ethavpn signature. The build fails unless every APK shows exactly that.
+- **Keep both keystores and their passwords forever** (encrypted, off the server). The Ethavpn key still
+  signs for Android 7–8 and the proof: losing it breaks updates on those phones. Never rotate back.
+- **Before the first rotated release:** install a push build's arm64 APK (Actions → the run →
+  `release-files`) over SkyRay 1.1.5 from `/dl/` on an Android 9+ phone, and on Android 7–8 if one is at
+  hand: it must offer **Update** and keep the imported link. Upload that run's bundle to Play's internal
+  testing track: Play must accept it.
+- **If Play answers "signed with the wrong key"**, Play still expects the old upload key: Play Console →
+  App integrity → App signing → **Request upload key reset**, with the Allion certificate
+  (`keytool -export -rfc -keystore skyray-release.jks -alias skyray -file upload_certificate.pem`, on
+  the operator's machine). Never upload or share the keystore itself.
 
 ## Google Play
 
 Every release also carries `SkyRay_X.Y.Z_play.aab`, the `play` flavor as an Android App Bundle signed
-with the same release key: no in-app updater and no `REQUEST_INSTALL_PACKAGES` (Play's policy), the
+with the Allion LLC key (Play's upload key; see **Signing keys**): no in-app updater and no `REQUEST_INSTALL_PACKAGES` (Play's policy), the
 update row opens the Play listing, the same versionCode as the APKs (4000000 + build number) so a phone
 can move between a direct install and a Play install. Nothing on the server touches it: download it from
 the GitHub release page and upload it in the Play Console (Release → a testing track or Production →
