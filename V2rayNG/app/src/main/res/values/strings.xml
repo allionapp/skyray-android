@@ -521,7 +521,9 @@
     <string name="etha_server_auto">Auto (fastest)</string>
     <string name="etha_server_button">Server: %s</string>
     <string name="etha_server_pick">Choose a server</string>
-    <string name="etha_test_again">Test again</string>
+    <string name="etha_test_again">Ping all</string>
+    <string name="etha_ping_best">Fastest now: %s</string>
+    <string name="etha_ping_kept">%s stays — choose Auto to switch to the fastest</string>
     <string name="etha_ping_untested">not tested</string>
     <string name="etha_ping_failed">failed</string>
     <string name="etha_bypass_apps">Apps that bypass the VPN</string>

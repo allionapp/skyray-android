@@ -119,7 +119,8 @@ class HomeActivity : HelperBaseActivity() {
                 pendingConnect = false
                 connectWithBest()
             } else {
-                // Auto means the best line of the latest test: re-pick, and move over if connected.
+                // Auto means the best line of the latest test: re-pick, and move over if connected. Either way
+                // the customer hears the outcome (a "Ping all" that changes nothing visible looked broken).
                 val s = sub
                 if (s != null && !isPinned()) {
                     val best = AutoSelect.pickBest(s.guid)
@@ -135,6 +136,11 @@ class HomeActivity : HelperBaseActivity() {
                             }
                         }
                     }
+                    val name = best?.let { MmkvManager.decodeServerConfig(it)?.remarks }?.let { ServerPicker.displayName(it) }
+                    if (name != null) toastSuccess(getString(R.string.etha_ping_best, name)) else toastError(R.string.etha_no_line)
+                } else if (s != null) {
+                    val kept = MmkvManager.getSelectServer()?.let { MmkvManager.decodeServerConfig(it)?.remarks }?.let { ServerPicker.displayName(it) }
+                    if (kept != null) toast(getString(R.string.etha_ping_kept, kept))
                 }
                 render()
             }

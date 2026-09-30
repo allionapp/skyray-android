@@ -1,1 +1,1 @@
-Your link moves to the new address (fra.skyrayconfig.org) by itself, and links on it open SkyRay. Updates come only from fra.mobileiphonez.org/dl/. Nothing to do on your side.
+Ping all: the button measures every server and says what it found — the fastest line (and moves to it in Auto), or that your picked server stays. Same as the iPhone app.
