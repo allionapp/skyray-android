@@ -1,8 +1,12 @@
 package com.v2ray.ang.ui
 
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.Intent
 import android.content.res.ColorStateList
-import android.widget.ArrayAdapter
+import android.text.format.DateUtils
+import android.view.animation.AccelerateDecelerateInterpolator
 import androidx.core.content.ContextCompat
 import android.net.VpnService
 import android.os.Build
@@ -63,7 +67,9 @@ class HomeActivity : HelperBaseActivity() {
     private var clipboardTried: String? = null   // the link last taken from the clipboard (no second import of the same one)
     private var pendingConnect = false    // waiting for a real-delay batch to pick the line
     private var updateResult: CheckUpdateResult? = null
-    private var rows: List<ServerPicker.Row> = emptyList()
+    private var serverSheet: ServerSheet? = null   // the open server sheet, re-rendered as pings land
+    private var pulse: AnimatorSet? = null         // the halo's slow breath while connected
+    private var lastProbe: String? = null          // the current server's last probe, for the chip
 
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (it.resultCode == RESULT_OK) {
@@ -95,16 +101,7 @@ class HomeActivity : HelperBaseActivity() {
         binding.btnRenew.setOnClickListener { Utils.openUri(this, AppConfig.ETHA_RENEW_URL) }
         binding.btnSupport.setOnClickListener { Utils.openUri(this, AppConfig.ETHA_SUPPORT_URL) }
         binding.btnTest.setOnClickListener { testAgain() }
-        binding.ddServer.setOnItemClickListener { _, _, position, _ ->
-            val guid = rows.getOrNull(position)?.guid
-            if (guid == null) {
-                MmkvManager.encodeSettings(AppConfig.PREF_ETHA_PINNED, false)
-            } else {
-                MmkvManager.setSelectServer(guid)
-                MmkvManager.encodeSettings(AppConfig.PREF_ETHA_PINNED, true)
-            }
-            onServerChoiceChanged()
-        }
+        binding.panelServer.setOnClickListener { showServerSheet() }
         binding.tvUpdate.setOnClickListener { Updates.open(this) }
 
         mainViewModel.isRunning.observe(this) { running ->
@@ -112,9 +109,9 @@ class HomeActivity : HelperBaseActivity() {
             render()
             if (running) mainViewModel.testCurrentServerRealPing()
         }
-        mainViewModel.updateTestResultAction.observe(this) { binding.tvLine.text = lineText(it) }
-        // every ping lands in the list as it is measured (the results are cleared when a test starts)
-        mainViewModel.updateListAction.observe(this) { renderServerDropdown(sub?.guid) }
+        mainViewModel.updateTestResultAction.observe(this) { lastProbe = it; renderChip() }
+        // every ping lands in the panel and the open sheet as it is measured (the results are cleared when a test starts)
+        mainViewModel.updateListAction.observe(this) { renderServerPanel(); serverSheet?.render() }
         mainViewModel.testsFinished.observe(this) {
             AutoSelect.markTested()
             if (pendingConnect) {
@@ -168,6 +165,12 @@ class HomeActivity : HelperBaseActivity() {
         refreshQuietlyIfStale()
     }
 
+    override fun onDestroy() {
+        pulse?.cancel()
+        serverSheet?.dismiss()
+        super.onDestroy()
+    }
+
     /**
      * No account yet: the landing page copies the customer's link to the clipboard before the
      * download, so the app can add the account by itself — the card underneath only says "tap
@@ -212,7 +215,8 @@ class HomeActivity : HelperBaseActivity() {
         val servers = s?.let { MmkvManager.decodeServerList(it.guid) } ?: emptyList()
         val empty = s == null || servers.isEmpty()
         binding.cardEmpty.isVisible = empty
-        binding.cardStatus.isVisible = !empty
+        binding.hero.isVisible = !empty
+        binding.panelServer.isVisible = !empty
         binding.cardAccount.isVisible = !empty
 
         val running = mainViewModel.isRunning.value == true
@@ -224,28 +228,72 @@ class HomeActivity : HelperBaseActivity() {
                 else -> R.string.etha_state_not_connected
             }
         )
-        binding.tvConnectHint.text = getString(if (running) R.string.etha_tap_to_disconnect else R.string.etha_tap_to_connect)
+        // the hint under the state: "Tap to connect" + what Auto does; connected, the chip takes its place
+        binding.tvConnectHint.isVisible = !running
+        binding.tvConnectHint.text = if (isPinned()) getString(R.string.etha_tap_to_connect)
+            else getString(R.string.etha_tap_to_connect) + "\n" + getString(R.string.etha_auto_hint)
         binding.btnConnect.isEnabled = !connecting && !pendingConnect
         binding.btnConnect.backgroundTintList = ColorStateList.valueOf(
-            ContextCompat.getColor(this, if (running) R.color.colorPing else R.color.md_theme_primary)
+            ContextCompat.getColor(this, if (running) R.color.etha_green else R.color.etha_blue)
         )
+        binding.halo.setBackgroundResource(if (running) R.drawable.bg_halo_green else R.drawable.bg_halo_blue)
+        pulseHalo(running)
         binding.progress.isVisible = connecting || pendingConnect
-        binding.tvLine.text = lineText(null)
-        renderServerDropdown(s?.guid)
+        renderChip()
+        renderServerPanel()
         if (s != null) renderAccount(s.subscription)
     }
 
-    /** The server field: Auto (with the line it picked) or a pinned line; the list carries every ping. */
-    private fun renderServerDropdown(subId: String?) {
-        rows = if (subId == null) emptyList() else ServerPicker.rows(
-            AutoSelect.candidates(subId),
-            nameOf = { guid -> MmkvManager.decodeServerConfig(guid)?.remarks ?: guid },
-            auto = getString(R.string.etha_server_auto),
-            untested = getString(R.string.etha_ping_untested),
-            failed = getString(R.string.etha_ping_failed)
-        )
-        binding.ddServer.setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, rows.map { it.text }))
-        binding.ddServer.setText(ServerPicker.currentLabel(this, isPinned()), false)
+    /** The halo breathes slowly while connected — the one motion on the screen. */
+    private fun pulseHalo(on: Boolean) {
+        if (on) {
+            if (pulse?.isRunning == true) return
+            val sx = ObjectAnimator.ofFloat(binding.halo, "scaleX", 1f, 1.12f)
+            val sy = ObjectAnimator.ofFloat(binding.halo, "scaleY", 1f, 1.12f)
+            val a = ObjectAnimator.ofFloat(binding.halo, "alpha", 0.85f, 1f)
+            for (o in listOf(sx, sy, a)) { o.repeatCount = ValueAnimator.INFINITE; o.repeatMode = ValueAnimator.REVERSE }
+            pulse = AnimatorSet().apply { playTogether(sx, sy, a); duration = 1300; interpolator = AccelerateDecelerateInterpolator(); start() }
+        } else {
+            pulse?.cancel(); pulse = null
+            binding.halo.scaleX = 1f; binding.halo.scaleY = 1f; binding.halo.alpha = 0.85f
+        }
+    }
+
+    /** The chip under the state while connected: the server and its last probe. */
+    private fun renderChip() {
+        val text = chipText()
+        binding.tvLine.isVisible = text.isNotEmpty()
+        binding.tvLine.text = text
+    }
+
+    /** The server panel: Auto → the line it picked (or the pinned line) and its ping. */
+    private fun renderServerPanel() {
+        val name = ServerPicker.currentName()
+        val ms = ServerPicker.currentDelay()
+        binding.tvServerValue.text = when {
+            name == null -> getString(R.string.etha_server_auto)
+            isPinned() -> name
+            else -> getString(R.string.etha_auto_picked, name)
+        }
+        binding.tvServerMs.text = if (ms > 0) "$ms ms" else ""
+        binding.tvServerMs.setTextColor(ServerPicker.dotColor(this, ms))
+    }
+
+    private fun showServerSheet() {
+        val s = sub ?: return
+        serverSheet = ServerPicker.show(
+            this, s.guid, isPinned(),
+            onPick = { guid ->
+                if (guid == null) {
+                    MmkvManager.encodeSettings(AppConfig.PREF_ETHA_PINNED, false)
+                } else {
+                    MmkvManager.setSelectServer(guid)
+                    MmkvManager.encodeSettings(AppConfig.PREF_ETHA_PINNED, true)
+                }
+                onServerChoiceChanged()
+            },
+            onTest = { testAgain() }
+        ).also { sheet -> sheet.setOnDismissListener { if (serverSheet === sheet) serverSheet = null } }
     }
 
     // ---------------------------------------------------------------- the server choice
@@ -271,18 +319,19 @@ class HomeActivity : HelperBaseActivity() {
         toast(R.string.etha_state_finding)
         mainViewModel.testAllRealPing()
         render()   // the cleared results show at once; each ping fills in as it lands
+        serverSheet?.render()
     }
 
-    private fun lineText(latency: String?): String {
+    /** "CleanIP3 · XHTTP/443 · 412 ms" while connected (the probe's number, else the last test's), else "". */
+    private fun chipText(): String {
         if (mainViewModel.isRunning.value != true) return ""
-        val guid = MmkvManager.getSelectServer()
-        val name = guid?.let { MmkvManager.decodeServerConfig(it)?.remarks }.orEmpty()
-        if (name.isEmpty()) return ""
-        return getString(R.string.etha_line, ServerPicker.displayName(name)) + (latency?.let { "\n$it" } ?: "")
+        val name = ServerPicker.currentName() ?: return ""
+        val probed = lastProbe?.let { Regex("(\\d+)\\s*ms").find(it)?.groupValues?.get(1)?.toLongOrNull() }
+        val ms = probed ?: ServerPicker.currentDelay()
+        return if (ms > 0) "$name · $ms ms" else name
     }
 
     private fun renderAccount(item: SubscriptionItem) {
-        binding.tvSubName.text = item.profileTitle ?: item.remarks
         val days = EthaSubscription.daysLeft(item.expire)
         when {
             days == null -> { binding.tvDays.text = "–"; binding.tvDaysLabel.text = getString(R.string.etha_days_label) }
@@ -296,6 +345,14 @@ class HomeActivity : HelperBaseActivity() {
             item.total == 0L -> { binding.tvData.text = used; binding.tvDataLabel.text = getString(R.string.etha_data_unlimited) }
             else -> { binding.tvData.text = used; binding.tvDataLabel.text = getString(R.string.etha_data_label_of, fmtBytes(item.total)) }
         }
+        binding.dataBar.isVisible = item.total > 0
+        if (item.total > 0) {
+            val usedBytes = maxOf(0L, item.download) + maxOf(0L, item.upload)
+            binding.dataBar.setProgressCompat((usedBytes * 100 / item.total).toInt().coerceIn(0, 100), false)
+        }
+        binding.tvUpdated.text = if (item.lastUpdated > 0) {
+            getString(R.string.etha_updated, DateUtils.getRelativeTimeSpanString(item.lastUpdated, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS))
+        } else getString(R.string.etha_updated_never)
         binding.tvAnnounce.isVisible = !item.announce.isNullOrBlank()
         binding.tvAnnounce.text = item.announce
     }
@@ -484,11 +541,13 @@ class HomeActivity : HelperBaseActivity() {
     }
 
     private fun refreshServers() {
+        binding.btnRefresh.isEnabled = false
         showLoading()
         lifecycleScope.launch(Dispatchers.IO) {
             val result = mainViewModel.updateConfigViaSubAll()
             withContext(Dispatchers.Main) {
                 hideLoading()
+                binding.btnRefresh.isEnabled = true
                 refreshSubscription()
                 render()
                 SubscriptionUpdater.sync(forceReschedule = true)   // the background refresh, timed from this fetch

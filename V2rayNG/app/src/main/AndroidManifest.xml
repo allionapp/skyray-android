@@ -58,7 +58,8 @@
         <activity
             android:name=".ui.HomeActivity"
             android:exported="true"
-            android:launchMode="singleTask">
+            android:launchMode="singleTask"
+            android:theme="@style/AppThemeDayNight.NoActionBar.Home">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

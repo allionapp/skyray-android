@@ -532,6 +532,15 @@
     <string name="etha_share_app">Поделиться приложением</string>
     <string name="etha_share_app_hint">Отправьте другу ссылки на SkyRay</string>
     <string name="etha_share_text">SkyRay — простой VPN, который работает в Иране.\nAndroid: %1$s\niPhone: %2$s\nTelegram: %3$s</string>
+    <string name="etha_server">Сервер</string>
+    <string name="etha_servers_count">Серверов: %d</string>
+    <string name="etha_show_all">Показать все %d ▾</string>
+    <string name="etha_show_fewer">Свернуть ▴</string>
+    <string name="etha_fastest">Самые быстрые</string>
+    <string name="etha_auto_now">Сейчас %s</string>
+    <string name="etha_auto_hint">Авто выбирает самый быстрый сервер</string>
+    <string name="etha_updated">Обновлено %s</string>
+    <string name="etha_updated_never">Ещё не обновлялось</string>
     <string name="etha_privacy_policy">Политика конфиденциальности</string>
     <string name="etha_delete_account">Удалить аккаунт</string>
     <string name="etha_delete_account_hint">Удаляет подписку и все её данные с этого телефона</string>

@@ -3,236 +3,296 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:scrollbars="none">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingStart="20dp"
-        android:paddingTop="12dp"
+        android:paddingTop="4dp"
         android:paddingEnd="20dp"
-        android:paddingBottom="28dp">
+        android:paddingBottom="24dp">
 
         <!-- no subscription yet -->
-        <com.google.android.material.card.MaterialCardView
+        <LinearLayout
             android:id="@+id/card_empty"
-            style="@style/EthaCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_panel"
+            android:orientation="vertical"
+            android:padding="20dp"
             android:visibility="gone">
 
-            <LinearLayout
+            <TextView style="@style/EthaTitle" android:text="@string/etha_empty_title" />
+            <TextView style="@style/EthaBody" android:layout_marginTop="6dp" android:text="@string/etha_empty_hint" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_paste"
+                style="@style/EthaPrimaryButton"
+                android:layout_marginTop="18dp"
+                android:text="@string/etha_paste_link" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_scan"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
+                android:fontFamily="@font/vazirmatn"
+                android:textColor="@color/etha_blue_light"
+                android:text="@string/etha_scan_qr" />
+        </LinearLayout>
 
-                <TextView
-                    style="@style/EthaTitle"
-                    android:text="@string/etha_empty_title" />
+        <!-- the hero: the glowing Connect button, the state, the server chip -->
+        <LinearLayout
+            android:id="@+id/hero"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingTop="18dp"
+            android:paddingBottom="14dp">
 
-                <TextView
-                    style="@style/EthaBody"
-                    android:layout_marginTop="6dp"
-                    android:text="@string/etha_empty_hint" />
+            <FrameLayout
+                android:layout_width="204dp"
+                android:layout_height="204dp">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_paste"
-                    style="@style/EthaPrimaryButton"
-                    android:layout_marginTop="18dp"
-                    android:text="@string/etha_paste_link" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_scan"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/etha_scan_qr" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- connection -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/card_status"
-            style="@style/EthaCard">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_horizontal"
-                android:orientation="vertical"
-                android:paddingStart="20dp"
-                android:paddingTop="28dp"
-                android:paddingEnd="20dp"
-                android:paddingBottom="20dp">
+                <View
+                    android:id="@+id/halo"
+                    android:layout_width="204dp"
+                    android:layout_height="204dp"
+                    android:background="@drawable/bg_halo_blue" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_connect"
-                    android:layout_width="156dp"
-                    android:layout_height="156dp"
+                    android:layout_width="150dp"
+                    android:layout_height="150dp"
+                    android:layout_gravity="center"
                     android:contentDescription="@string/etha_connect"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    app:cornerRadius="78dp"
+                    app:cornerRadius="75dp"
+                    app:elevation="0dp"
                     app:icon="@drawable/ic_power_48dp"
                     app:iconGravity="textStart"
                     app:iconPadding="0dp"
-                    app:iconSize="60dp"
+                    app:iconSize="58dp"
                     app:iconTint="@color/colorWhite" />
+            </FrameLayout>
 
-                <TextView
-                    android:id="@+id/tv_state"
-                    style="@style/EthaHeadline"
-                    android:layout_marginTop="18dp"
-                    android:gravity="center"
-                    android:text="@string/etha_state_not_connected" />
+            <TextView
+                android:id="@+id/tv_state"
+                style="@style/EthaHeadline"
+                android:layout_marginTop="14dp"
+                android:gravity="center"
+                android:text="@string/etha_state_not_connected" />
 
-                <TextView
-                    android:id="@+id/tv_connect_hint"
-                    style="@style/EthaMuted"
-                    android:gravity="center"
-                    android:text="@string/etha_tap_to_connect" />
+            <TextView
+                android:id="@+id/tv_connect_hint"
+                style="@style/EthaMuted"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.35"
+                android:textSize="13sp"
+                android:text="@string/etha_tap_to_connect" />
 
-                <TextView
-                    android:id="@+id/tv_line"
-                    style="@style/EthaMuted"
-                    android:layout_marginTop="4dp"
-                    android:gravity="center" />
+            <TextView
+                android:id="@+id/tv_line"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_chip"
+                android:drawableStart="@drawable/bg_dot"
+                android:drawablePadding="6dp"
+                android:fontFamily="@font/vazirmatn"
+                android:gravity="center_vertical"
+                android:paddingStart="10dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="4dp"
+                android:textColor="@color/etha_green_light"
+                android:textSize="12sp"
+                android:visibility="gone" />
 
-                <com.google.android.material.progressindicator.CircularProgressIndicator
-                    android:id="@+id/progress"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:indeterminate="true"
-                    android:visibility="gone"
-                    app:indicatorSize="28dp" />
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/progress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:indeterminate="true"
+                android:visibility="gone"
+                app:indicatorColor="@color/etha_blue_light"
+                app:indicatorSize="24dp"
+                app:trackThickness="3dp" />
+        </LinearLayout>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/til_server"
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:hint="@string/etha_server_pick"
-                        app:boxCornerRadiusBottomEnd="14dp"
-                        app:boxCornerRadiusBottomStart="14dp"
-                        app:boxCornerRadiusTopEnd="14dp"
-                        app:boxCornerRadiusTopStart="14dp">
-
-                        <AutoCompleteTextView
-                            android:id="@+id/dd_server"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="@font/vazirmatn"
-                            android:inputType="none"
-                            android:textSize="15sp" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_test"
-                        style="@style/Widget.Material3.Button.TextButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:fontFamily="@font/vazirmatn"
-                        android:text="@string/etha_test_again"
-                        android:textSize="13sp" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- account -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/card_account"
-            style="@style/EthaCard">
+        <!-- the server panel: tap → the sheet -->
+        <LinearLayout
+            android:id="@+id/panel_server"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_panel"
+            android:clickable="true"
+            android:focusable="true"
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="12dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
                 <TextView
-                    android:id="@+id/tv_sub_name"
-                    style="@style/EthaTitle" />
+                    style="@style/EthaLabel"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:text="@string/etha_server" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="horizontal">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_test"
+                    style="@style/EthaLinkButton"
+                    android:text="@string/etha_test_again" />
+            </LinearLayout>
 
-                    <LinearLayout style="@style/EthaTile">
-                        <TextView android:id="@+id/tv_days" style="@style/EthaTileValue" />
-                        <TextView android:id="@+id/tv_days_label" style="@style/EthaTileLabel" />
-                    </LinearLayout>
-
-                    <Space
-                        android:layout_width="12dp"
-                        android:layout_height="1dp" />
-
-                    <LinearLayout style="@style/EthaTile">
-                        <TextView android:id="@+id/tv_data" style="@style/EthaTileValue" />
-                        <TextView android:id="@+id/tv_data_label" style="@style/EthaTileLabel" />
-                    </LinearLayout>
-                </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingEnd="8dp">
 
                 <TextView
-                    android:id="@+id/tv_announce"
-                    style="@style/EthaBody"
-                    android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_announce"
-                    android:padding="12dp"
-                    android:visibility="gone" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
+                    android:id="@+id/tv_server_value"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="horizontal">
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/vazirmatn"
+                    android:maxLines="1"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="14sp" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_renew"
-                        style="@style/EthaPrimaryButton"
-                        android:layout_width="0dp"
-                        android:layout_marginBottom="0dp"
-                        android:layout_weight="1"
-                        android:text="@string/etha_renew" />
+                <TextView
+                    android:id="@+id/tv_server_ms"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:fontFamily="@font/vazirmatn"
+                    android:textColor="@color/etha_green_light"
+                    android:textSize="12sp" />
 
-                    <Space
-                        android:layout_width="10dp"
-                        android:layout_height="1dp" />
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_marginStart="4dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_chevron_right_20dp"
+                    app:tint="@color/etha_muted" />
+            </LinearLayout>
+        </LinearLayout>
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_support"
-                        style="@style/EthaOutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_marginBottom="0dp"
-                        android:layout_weight="1"
-                        android:text="@string/etha_support" />
+        <!-- the account tiles -->
+        <LinearLayout
+            android:id="@+id/card_account"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <LinearLayout style="@style/EthaTile">
+                    <TextView android:id="@+id/tv_days" style="@style/EthaTileValue" />
+                    <TextView android:id="@+id/tv_days_label" style="@style/EthaTileLabel" />
                 </LinearLayout>
+
+                <Space android:layout_width="10dp" android:layout_height="1dp" />
+
+                <LinearLayout style="@style/EthaTile">
+                    <TextView android:id="@+id/tv_data" style="@style/EthaTileValue" />
+                    <TextView android:id="@+id/tv_data_label" style="@style/EthaTileLabel" />
+                    <com.google.android.material.progressindicator.LinearProgressIndicator
+                        android:id="@+id/data_bar"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:visibility="gone"
+                        app:indicatorColor="@color/etha_blue_light"
+                        app:trackColor="@color/etha_track"
+                        app:trackCornerRadius="2dp"
+                        app:trackThickness="4dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_announce"
+                style="@style/EthaBody"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_announce"
+                android:padding="12dp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="4dp">
+
+                <TextView
+                    android:id="@+id/tv_updated"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/vazirmatn"
+                    android:textColor="@color/etha_muted"
+                    android:textSize="12sp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_refresh"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:fontFamily="@font/vazirmatn"
+                    style="@style/EthaPill"
+                    app:icon="@drawable/ic_refresh_16dp"
                     android:text="@string/etha_refresh" />
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_renew"
+                    style="@style/EthaPrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_marginBottom="0dp"
+                    android:layout_weight="1"
+                    android:text="@string/etha_renew" />
+
+                <Space android:layout_width="10dp" android:layout_height="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_support"
+                    style="@style/EthaOutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_marginBottom="0dp"
+                    android:layout_weight="1"
+                    android:text="@string/etha_support" />
+            </LinearLayout>
+        </LinearLayout>
 
         <TextView
             android:id="@+id/tv_update"
             style="@style/EthaBody"
+            android:layout_marginTop="12dp"
             android:background="@drawable/bg_announce"
             android:clickable="true"
             android:focusable="true"

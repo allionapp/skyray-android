@@ -54,15 +54,17 @@
         <item name="colorPrimaryInverse">@color/md_theme_inversePrimary</item>
 
         <!-- Status bar and navigation bar - system bars -->
-        <item name="android:statusBarColor">@color/md_theme_surface</item>
-        <item name="android:navigationBarColor">@color/md_theme_surface</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/md_theme_background</item>
+        <item name="toolbarStyle">@style/EthaToolbar</item>
+        <item name="bottomSheetDialogTheme">@style/EthaBottomSheetDialog</item>
     </style>
 
     <!-- Day/Night theme: inherit common values and set light-mode-specific items -->
     <style name="AppThemeDayNight" parent="AppThemeBase">
         <!-- day/night-specific overrides (light/default) -->
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
     </style>
 
     <!-- Theme without ActionBar -->
@@ -79,6 +81,28 @@
 
     <style name="BrandedSwitch" parent="AppThemeDayNight">
         <item name="colorPrimary">@color/color_fab_active</item>
+    </style>
+
+    <!-- The Home screen's ground: the gradient behind the toolbar and the content alike -->
+    <style name="AppThemeDayNight.NoActionBar.Home">
+        <item name="android:windowBackground">@drawable/bg_home</item>
+    </style>
+    <style name="EthaToolbar" parent="Widget.Material3.Toolbar">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="titleTextAppearance">@style/EthaToolbarTitle</item>
+        <item name="titleTextColor">?attr/colorOnSurface</item>
+    </style>
+    <style name="EthaToolbarTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:fontFamily">@font/vazirmatn</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="EthaBottomSheetDialog" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/EthaBottomSheet</item>
+    </style>
+    <style name="EthaBottomSheet" parent="Widget.Material3.BottomSheet">
+        <item name="android:background">@drawable/bg_sheet</item>
+        <item name="backgroundTint">@null</item>
     </style>
 
     <!-- EthaVPN home -->
@@ -120,9 +144,18 @@
         <item name="android:textSize">14sp</item>
         <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
     </style>
+    <style name="EthaLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:fontFamily">@font/vazirmatn</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:textColor">@color/etha_muted</item>
+    </style>
     <style name="EthaPrimaryButton" parent="Widget.Material3.Button">
         <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">52dp</item>
+        <item name="android:layout_height">50dp</item>
         <item name="android:layout_marginBottom">10dp</item>
         <item name="android:fontFamily">@font/vazirmatn</item>
         <item name="android:textSize">15sp</item>
@@ -130,34 +163,70 @@
     </style>
     <style name="EthaOutlinedButton" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">52dp</item>
+        <item name="android:layout_height">50dp</item>
         <item name="android:layout_marginBottom">10dp</item>
         <item name="android:fontFamily">@font/vazirmatn</item>
         <item name="android:textSize">15sp</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="strokeColor">@color/etha_edge</item>
         <item name="cornerRadius">14dp</item>
+    </style>
+    <style name="EthaPill" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">32dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:fontFamily">@font/vazirmatn</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="strokeColor">@color/etha_edge</item>
+        <item name="backgroundTint">@color/etha_panel</item>
+        <item name="iconSize">14dp</item>
+        <item name="iconPadding">6dp</item>
+        <item name="iconTint">?attr/colorOnSurface</item>
+        <item name="cornerRadius">16dp</item>
+    </style>
+    <style name="EthaLinkButton" parent="Widget.Material3.Button.TextButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">36dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:fontFamily">@font/vazirmatn</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/etha_blue_light</item>
     </style>
     <style name="EthaTile">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_weight">1</item>
         <item name="android:orientation">vertical</item>
-        <item name="android:background">@drawable/bg_tile</item>
-        <item name="android:padding">14dp</item>
+        <item name="android:background">@drawable/bg_panel</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
     </style>
     <style name="EthaTileValue">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:fontFamily">@font/vazirmatn</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:textSize">22sp</item>
+        <item name="android:textSize">26sp</item>
+        <item name="android:includeFontPadding">false</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
     <style name="EthaTileLabel">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">4dp</item>
         <item name="android:fontFamily">@font/vazirmatn</item>
-        <item name="android:textSize">13sp</item>
-        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/etha_muted</item>
     </style>
 
     <!-- EthaVPN settings rows -->

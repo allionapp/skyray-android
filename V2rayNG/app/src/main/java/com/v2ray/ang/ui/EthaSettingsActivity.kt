@@ -57,15 +57,18 @@ class EthaSettingsActivity : BaseActivity() {
         super.onResume()
         binding.layoutAdvanced.isVisible = MmkvManager.decodeSettingsBool(AppConfig.PREF_ETHA_EXPERT, false)
         binding.tvServerValue.text = ServerPicker.currentLabel(this, MmkvManager.decodeSettingsBool(AppConfig.PREF_ETHA_PINNED, false))
+        serverSheet?.render()
         val codes = resources.getStringArray(R.array.language_select_value)
         val names = resources.getStringArray(R.array.language_select)
         val code = MmkvManager.decodeSettingsString(AppConfig.PREF_LANGUAGE) ?: "auto"
         binding.tvLanguageValue.text = names.getOrNull(codes.indexOf(code).takeIf { it >= 0 } ?: 0)
     }
 
+    private var serverSheet: ServerSheet? = null
+
     private fun pickServer() {
         val sub = EthaSubscription.find() ?: return
-        ServerPicker.show(
+        serverSheet = ServerPicker.show(
             this, sub.guid, MmkvManager.decodeSettingsBool(AppConfig.PREF_ETHA_PINNED, false),
             onPick = { guid ->
                 if (guid == null) {
@@ -80,6 +83,7 @@ class EthaSettingsActivity : BaseActivity() {
             },
             onTest = {
                 // the test itself runs from Home (it owns the view model); go back there
+                serverSheet?.dismiss()
                 setResult(RESULT_OK, Intent().putExtra(EXTRA_SERVER_CHANGED, serverChanged).putExtra(HomeActivity.EXTRA_TEST, true))
                 finish()
             }

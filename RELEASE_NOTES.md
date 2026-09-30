@@ -1,1 +1,1 @@
-Settings has Share this app: send a friend the Google Play, App Store and Telegram links in one message.
+A new look: a dark ground, a glowing Connect button, the server you are on under the state, and a server sheet that opens from the bottom with Auto on top and the fastest servers first. Ping all shows every result as it lands; your server changes only when you connect or pick one. Settings has Share this app.
