@@ -80,7 +80,7 @@ jobs:
     # the VPN so the app itself (its ad requests among it) can ride the tunnel. Upstream's library
     # does not have it, and the app does not compile against it. Same steps as the core's own CI.
     - name: Setup Go (for the Xray core)
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@v7
       with:
         go-version-file: 'AndroidLibXrayLite/go.mod'
         cache-dependency-path: 'AndroidLibXrayLite/go.sum'
