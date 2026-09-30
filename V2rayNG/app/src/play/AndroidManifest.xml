@@ -1,29 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The Google Play build: updates come from Play, so the in-app updater's installer permission goes
-     (Play's policy for REQUEST_INSTALL_PACKAGES); Updates.open() sends the customer to the listing. -->
+     (Play's policy for REQUEST_INSTALL_PACKAGES); Updates.open() sends the customer to the listing.
+     The ad (AdMob) is in both builds: its entries are in the main manifest. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission
         android:name="android.permission.REQUEST_INSTALL_PACKAGES"
         tools:node="remove" />
-
-    <application>
-        <!-- SkyRay's AdMob app (Android); the ad itself is AdsGate in src/play. -->
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-8085563084618250~7581627992" />
-        <!-- The ad SDK brings Google Analytics measurement along, which would otherwise start with
-             the app, before any tunnel, and upload on its own schedule. SkyRay uses none of it. -->
-        <meta-data
-            android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT"
-            android:value="true" />
-        <meta-data
-            android:name="firebase_analytics_collection_deactivated"
-            android:value="true" />
-        <meta-data
-            android:name="google_analytics_adid_collection_enabled"
-            android:value="false" />
-    </application>
 
 </manifest>

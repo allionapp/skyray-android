@@ -28,7 +28,7 @@ class CoreTestService : Service() {
     override fun onCreate() {
         super.onCreate()
         CoreNativeManager.initCoreEnv(this)
-        // The app rides its own tunnel in the Play build; a delay test must still go straight out.
+        // The app rides its own tunnel; a delay test must still go straight out.
         TunnelSelf.installProtector()
     }
 

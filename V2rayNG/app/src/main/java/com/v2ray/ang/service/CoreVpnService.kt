@@ -84,7 +84,7 @@ class CoreVpnService : VpnService(), ServiceControl {
     }
 
     /**
-     * The app was swiped away while a rewarded ad was still on screen (Play build only; the flag
+     * The app was swiped away while a rewarded ad was still on screen (the flag
      * is never set otherwise): the connection it was paying for ends with it. A stale flag from
      * a process that died is ignored after ten minutes, longer than any ad runs.
      */
@@ -317,7 +317,7 @@ class CoreVpnService : VpnService(), ServiceControl {
      */
     private fun configurePerAppProxy(builder: Builder) {
         val selfPackageName = BuildConfig.APPLICATION_ID
-        // The Play build keeps the app inside its own tunnel (see TunnelSelf): the core's sockets
+        // SkyRay keeps the app inside its own tunnel (see TunnelSelf): the core's sockets
         // are protected instead. The VPN stays non-bypassable, so no other app — Google Play
         // services among them — can bind its way around it to the real network.
         val selfInside = TunnelSelf.wanted

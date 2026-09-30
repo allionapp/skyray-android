@@ -1,1 +1,1 @@
-Updates now come from the new address (fra.mobileiphonez.org/dl/), with the old one as a fallback. Nothing else changes.
+Your link moves to the new address (fra.skyrayconfig.org) by itself, and links on it open SkyRay. Updates come only from fra.mobileiphonez.org/dl/. Nothing to do on your side.

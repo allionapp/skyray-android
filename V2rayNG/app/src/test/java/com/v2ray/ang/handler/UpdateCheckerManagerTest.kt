@@ -14,9 +14,8 @@ class UpdateCheckerManagerTest {
     private val latest = LatestRelease(version = "1.1.0", versionCode = 110, minSupported = "1.0.5", notes = "faster", assets = listOf(arm, uni))
 
     @Test
-    fun downloadsComeOnlyFromTheNewHost() {
-        assertEquals(listOf("https://fra.mobileiphonez.org/dl/"), AppConfig.ETHA_DOWNLOAD_BASES)
-        assertEquals(AppConfig.ETHA_DOWNLOAD_BASES.first(), AppConfig.ETHA_DOWNLOAD_BASE)
+    fun updatesComeFromTheDownloadHostOnly() {
+        assertEquals("https://fra.mobileiphonez.org/dl/", AppConfig.ETHA_DOWNLOAD_BASE)   // no fallback host, no GitHub
         assertEquals("https://fra.mobileiphonez.org/dl/EthaVPN_1.1.0_arm64-v8a.apk",
             UpdateCheckerManager.evaluate(latest, "1.0.0", listOf("arm64-v8a"))!!.downloadUrl)
     }

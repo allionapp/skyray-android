@@ -53,6 +53,21 @@
         android:supportsRtl="true"
         android:theme="@style/AppThemeDayNight.NoActionBar"
         android:usesCleartextTraffic="true">
+        <!-- SkyRay's AdMob app (Android), in both builds; the ad itself is AdsGate. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-8085563084618250~7581627992" />
+        <!-- The ad SDK brings Google Analytics measurement along, which would otherwise start with
+             the app, before any tunnel, and upload on its own schedule. SkyRay uses none of it. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT"
+            android:value="true" />
+        <meta-data
+            android:name="firebase_analytics_collection_deactivated"
+            android:value="true" />
+        <meta-data
+            android:name="google_analytics_adid_collection_enabled"
+            android:value="false" />
 
         <!-- EthaVPN: the one-screen home is the launcher; the full v2rayNG UI lives under Advanced -->
         <activity
@@ -170,19 +185,19 @@
                 <data android:host="install-sub" />
             </intent-filter>
             <!-- App Links: a verified app opens the subscription link itself, no page in between
-                 (statement: https://<host>/.well-known/assetlinks.json on every host). The hosts are
-                 AppConfig.ETHA_SUB_HOSTS; before Android 12 all of them must verify, or none does. -->
+                 (statement: https://${subHost}/.well-known/assetlinks.json). Only the link address
+                 (AppConfig.ETHA_SUB_HOST): before Android 12 every host here must verify or none
+                 does, and the earlier addresses are converted in the app instead. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
 
                 <category android:name="android.intent.category.BROWSABLE" />
                 <category android:name="android.intent.category.DEFAULT" />
 
-                <data android:scheme="https" />
-                <data android:host="fra.mobileiphone.org" />
-                <data android:host="fra.mobileiphonez.org" />
-                <data android:host="fra.skyrayconfig.org" />
-                <data android:pathPrefix="/sub/" />
+                <data
+                    android:host="${subHost}"
+                    android:pathPrefix="/sub/"
+                    android:scheme="https" />
             </intent-filter>
         </activity>
         <activity

@@ -47,9 +47,10 @@ android {
         targetSdk = 37
         // 4000000 + the build number: the same code in every ABI split and in the Play bundle, so a
         // phone can move between the direct APK and the Play install (the updater compares versionName).
-        versionCode = 4000122
-        versionName = "1.2.2"
+        versionCode = 4000124
+        versionName = "1.2.4"
         multiDexEnabled = true
+        manifestPlaceholders["subHost"] = "fra.skyrayconfig.org"   // AppConfig.ETHA_SUB_HOST: the only link address
 
         val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';')
         splits {
@@ -144,11 +145,11 @@ android {
 
 dependencies {
     // The Google Play build's ad (AdsGate in src/play); the direct build has none.
-    "playImplementation"("com.google.android.gms:play-services-ads:23.6.0")
-    "playImplementation"("com.google.android.ump:user-messaging-platform:3.1.0")
+    implementation("com.google.android.gms:play-services-ads:23.6.0")
+    implementation("com.google.android.ump:user-messaging-platform:3.1.0")
     // The ads SDK brings Guava at runtime only, which leaves WorkManager's ListenableFuture
     // resolved to Guava's empty stub at compile time; the same version, made visible.
-    "playImplementation"("com.google.guava:guava:31.1-android")
+    implementation("com.google.guava:guava:31.1-android")
     // Core Libraries
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
 

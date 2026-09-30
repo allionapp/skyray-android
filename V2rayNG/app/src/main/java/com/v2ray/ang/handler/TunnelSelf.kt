@@ -12,12 +12,12 @@ import libv2ray.SocketProtector
  *
  * v2rayNG leaves its own app out of the VPN, so the core's sockets never loop into the tunnel
  * they serve; the price is that everything else the app sends — the ad SDK's requests among
- * it — leaves on the real network, from the user's real address. The Play build instead keeps
+ * it — leaves on the real network, from the user's real address. SkyRay (both builds) instead keeps
  * the app inside the tunnel, like any other app on the phone, and exempts only the core's own
  * sockets, with VpnService.protect(). The VPN is not bypassable: no app can go around it.
  */
 object TunnelSelf {
-    /** The build that shows ads keeps the app inside its tunnel; the direct build is unchanged. */
+    /** A build that shows ads keeps the app inside its tunnel: both builds do. */
     val wanted: Boolean get() = AdsGate.SHOWS_ADS
 
     /**

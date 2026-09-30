@@ -89,60 +89,45 @@ class EthaSubscriptionTest {
     }
 
     @Test
-    fun everyHostOfTheServiceIsALink() {
-        for (host in listOf("fra.mobileiphone.org", "fra.mobileiphonez.org", "fra.skyrayconfig.org")) {
-            assertTrue(host, EthaSubscription.isSubLink("https://$host/sub/0123456789abcdef"))
-            assertEquals("https://$host/sub/0123456789abcdef",
-                EthaSubscription.extractSubLink("🔗 Your link:\nhttps://$host/sub/0123456789abcdef\n"))
+    fun linksComeFromFraSkyrayconfigOnly() {
+        assertEquals(listOf("fra.skyrayconfig.org"), AppConfig.ETHA_SUB_HOSTS)
+        assertEquals("fra.skyrayconfig.org", AppConfig.ETHA_SUB_HOST)
+        assertTrue(EthaSubscription.isSubLink("https://fra.skyrayconfig.org/sub/XXXXXXXXXXXXXX"))
+        // the earlier addresses, the tunnels' address, the bare domain and look-alikes are not a link
+        for (h in listOf("fra.mobileiphonez.org", "fra.mobileiphone.org", "api.mobileiphonez.org", "mobileiphonez.org",
+                         "fra.skyrayconfig.org.evil.example", "skyrayconfig.org")) {
+            assertFalse(h, EthaSubscription.isSubLink("https://$h/sub/0123456789abcdef"))
         }
-        assertFalse(EthaSubscription.isSubLink("https://skyrayconfig.org.evil.example/sub/0123456789abcdef"))
-        assertFalse(EthaSubscription.isSubLink("https://evil-fra.skyrayconfig.org/sub/0123456789abcdef"))
+        assertFalse(EthaSubscription.isSubLink("https://evil.example/fra.skyrayconfig.org/sub/0123456789abcdef"))
+        assertEquals("0123456789abcdef", EthaSubscription.tokenOf("https://fra.skyrayconfig.org/sub/0123456789abcdef#EthaVPN"))
+        assertNull(EthaSubscription.tokenOf("https://fra.mobileiphone.org/sub/0123456789abcdef"))
+        assertNull(EthaSubscription.tokenOf(null))
     }
 
     @Test
-    fun oneAccountOnEveryHost() {
-        val account = EthaSubscription.accountOf("https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN")
-        assertEquals("/sub/0123456789abcdef", account)
-        assertEquals(account, EthaSubscription.accountOf("https://fra.skyrayconfig.org/sub/0123456789abcdef"))
-        assertEquals(account, EthaSubscription.accountOf("https://FRA.MOBILEIPHONEZ.ORG/sub/0123456789abcdef#My line"))
-        assertFalse(account == EthaSubscription.accountOf("https://fra.skyrayconfig.org/sub/0123456789abcdeX"))
-        assertNull(EthaSubscription.accountOf("https://evil.example/sub/0123456789abcdef"))
-        assertNull(EthaSubscription.accountOf("https://fra.skyrayconfig.org/dl/latest.json"))
-        assertNull(EthaSubscription.accountOf(null))
+    fun anEarlierAddressBecomesFraSkyrayconfigWithTheSameToken() {
+        assertEquals("https://fra.skyrayconfig.org/sub/0123456789abcdef#EthaVPN",
+            EthaSubscription.migratedUrl("https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN"))
+        assertEquals("https://fra.skyrayconfig.org/sub/0123456789abcdef",
+            EthaSubscription.migratedUrl("https://FRA.MOBILEIPHONEZ.ORG/sub/0123456789abcdef"))
+        assertNull(EthaSubscription.migratedUrl("https://fra.skyrayconfig.org/sub/0123456789abcdef"))   // already there
+        assertNull(EthaSubscription.migratedUrl("https://api.mobileiphonez.org/sub/0123456789abcdef"))  // never a link address
+        assertNull(EthaSubscription.migratedUrl("https://fra.mobileiphone.org/dl/latest.json"))
+        assertNull(EthaSubscription.migratedUrl("https://fra.mobileiphone.org/sub/abc"))
+        assertNull(EthaSubscription.migratedUrl("http://fra.mobileiphone.org/sub/0123456789abcdef"))
+        assertNull(EthaSubscription.migratedUrl("https://evil.example/sub/0123456789abcdef"))
+        assertNull(EthaSubscription.migratedUrl(null))
     }
 
-    /** "Delete account" remembers the link it deleted; the clipboard must not bring the account back from any host. */
     @Test
-    fun theDeletedAccountIsKnownOnEveryHost() {
-        val deleted = "https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN"
-        assertTrue(EthaSubscription.sameAccount("https://fra.mobileiphone.org/sub/0123456789abcdef", deleted))
-        assertTrue(EthaSubscription.sameAccount("https://fra.skyrayconfig.org/sub/0123456789abcdef", deleted))
-        assertFalse(EthaSubscription.sameAccount("https://fra.skyrayconfig.org/sub/0123456789abcdeX", deleted))
-        assertTrue(EthaSubscription.sameAccount("https://other.example/s/1#a", "https://other.example/s/1"))
-        assertFalse(EthaSubscription.sameAccount("https://fra.skyrayconfig.org/sub/0123456789abcdef", ""))
-        assertFalse(EthaSubscription.sameAccount(null, deleted))
-    }
-
-    /** Later hosts are newer: an account never moves back to fra.mobileiphone.org, which is filtered in Iran. */
-    @Test
-    fun theFilteredHostRanksLowest() {
-        val old = EthaSubscription.hostRank("https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN")
-        val z = EthaSubscription.hostRank("https://fra.mobileiphonez.org/sub/0123456789abcdef")
-        val config = EthaSubscription.hostRank("https://FRA.SKYRAYCONFIG.ORG/sub/0123456789abcdef")
-        assertEquals(0, old)
-        assertTrue(old < z && z < config)
-        assertEquals(-1, EthaSubscription.hostRank("https://evil.example/sub/0123456789abcdef"))
-        assertEquals(-1, EthaSubscription.hostRank(null))
-    }
-
-    /** The App Links filter opens the app for the same hosts the app accepts a link from. */
-    @Test
-    fun appLinksCoverEveryHost() {
-        val manifest = File("src/main/AndroidManifest.xml").readText()
-        val filter = manifest.substringAfter("android:autoVerify=\"true\"").substringBefore("</intent-filter>")
-        val hosts = Regex("android:host=\"([^\"]+)\"").findAll(filter).map { it.groupValues[1] }.toSet()
-        assertEquals(AppConfig.ETHA_SUB_HOSTS.toSet(), hosts)
-        assertTrue(filter.contains("android:pathPrefix=\"${AppConfig.ETHA_SUB_PATH}\""))
+    fun oneAccountWhateverTheAddressOrName() {
+        val new = "https://fra.skyrayconfig.org/sub/0123456789abcdef"
+        assertTrue(EthaSubscription.sameAccount(new, "$new#EthaVPN"))
+        assertTrue(EthaSubscription.sameAccount("https://fra.mobileiphone.org/sub/0123456789abcdef#EthaVPN", new))
+        assertFalse(EthaSubscription.sameAccount(new, "https://fra.skyrayconfig.org/sub/fedcba9876543210"))
+        assertFalse(EthaSubscription.sameAccount(new, "https://evil.example/sub/0123456789abcdef"))
+        assertFalse(EthaSubscription.sameAccount(new, ""))
+        assertFalse(EthaSubscription.sameAccount(null, null))
     }
 
     @Test
@@ -152,6 +137,11 @@ class EthaSubscriptionTest {
         assertEquals(link, EthaSubscription.extractSubLink("🔗 Your link:\n$link\n\nTap it."))
         assertEquals(link, EthaSubscription.extractSubLink("لینک شما: $link، بعد وصل شوید."))
         assertEquals(link, EthaSubscription.extractSubLink(link))
+        val newLink = "https://fra.skyrayconfig.org/sub/XXXXXXXXXXXXXX"
+        assertEquals(newLink, EthaSubscription.extractSubLink("👇 Tap the link below, or the button.\n$newLink"))
+        // a message with an earlier address gives the link on the current one
+        assertEquals(newLink, EthaSubscription.extractSubLink("🔗 https://fra.mobileiphone.org/sub/XXXXXXXXXXXXXX."))
+        assertNull(EthaSubscription.extractSubLink("https://api.mobileiphonez.org/sub/XXXXXXXXXXXXXX"))
         assertNull(EthaSubscription.extractSubLink("nothing here"))
         assertNull(EthaSubscription.extractSubLink(null))
     }
@@ -216,5 +206,16 @@ class EthaSubscriptionTest {
             com.v2ray.ang.dto.entities.SubscriptionCache(guid, SubscriptionItem(remarks = remarks).apply { profileTitle = title })
         val subs = listOf(sub("a", "EthaVPN"), sub("b", "EthaVPN"), sub("c", "EthaVPN", "Sifaro"), sub("d", ""))
         assertEquals(listOf("EthaVPN 1", "EthaVPN 2", "Sifaro", "EthaVPN 3"), EthaSubscription.labels(subs))
+    }
+
+    /** The App Links filter opens the app for the link address, the one the app takes links from. */
+    @Test
+    fun appLinksOpenTheLinkAddress() {
+        val filter = File("src/main/AndroidManifest.xml").readText()
+            .substringAfter("android:autoVerify=\"true\"").substringBefore("</intent-filter>")
+        assertTrue(filter.contains("android:host=\"\${subHost}\""))
+        assertTrue(filter.contains("android:pathPrefix=\"${AppConfig.ETHA_SUB_PATH}\""))
+        val gradle = File("build.gradle.kts").readText()
+        assertTrue(gradle.contains("manifestPlaceholders[\"subHost\"] = \"${AppConfig.ETHA_SUB_HOST}\""))
     }
 }

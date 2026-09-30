@@ -4,6 +4,11 @@ name: Build APK and Play bundle
 # run with release_tag = vX.Y.Z also signs the APKs, the bundle and latest.json with the release GPG
 # key and publishes them as a GitHub release: ethavpn-app-publish on the server verifies and serves
 # the APKs from /dl/; SkyRay_<version>_play.aab is what goes into the Google Play Console by hand.
+#
+# Two signing keys. The Allion LLC key (ALLION_* secrets) signs the Play bundle (Google Play's upload key) and is the
+# direct APKs' signer on Android 9+, through APK Signature Scheme v3 key rotation from the Ethavpn key (APP_KEYSTORE_*
+# secrets): phones that installed an Ethavpn-signed SkyRay accept the update and trust the Allion key from then on.
+# Android 7-8 cannot rotate, so the direct APKs keep an Ethavpn v2 signature for them. Both keys are needed forever.
 on:
   workflow_dispatch:
     inputs:
@@ -26,6 +31,8 @@ jobs:
       uses: actions/checkout@v7
       with:
         submodules: 'recursive'
+        # the Xray core submodule (allionapp/AndroidLibXrayLite): public, or readable with this token
+        token: ${{ secrets.SUBMODULE_TOKEN || github.token }}
         fetch-depth: '0'
 
     - name: Setup Android SDK
@@ -68,21 +75,28 @@ jobs:
       run: |
         cp -r ${{ github.workspace }}/libs ${{ github.workspace }}/V2rayNG/app
 
-    - name: Fetch AndroidLibXrayLite tag
-      run: |
-        pushd AndroidLibXrayLite
-        CURRENT_TAG=$(git describe --tags --abbrev=0)
-        echo "Current tag in this repo: $CURRENT_TAG"
-        echo "CURRENT_TAG=$CURRENT_TAG" >> $GITHUB_ENV
-        popd
-
-    - name: Download libv2ray
-      uses: robinraju/release-downloader@v1.13
+    # The Xray core is built from the AndroidLibXrayLite submodule, not downloaded from 2dust's
+    # releases: SkyRay's core adds RegisterSocketProtector, which keeps the core's own sockets out of
+    # the VPN so the app itself (its ad requests among it) can ride the tunnel. Upstream's library
+    # does not have it, and the app does not compile against it. Same steps as the core's own CI.
+    - name: Setup Go (for the Xray core)
+      uses: actions/setup-go@v6
       with:
-        repository: '2dust/AndroidLibXrayLite'
-        tag: ${{ env.CURRENT_TAG }}
-        fileName: 'libv2ray.aar'
-        out-file-path: V2rayNG/app/libs/
+        go-version-file: 'AndroidLibXrayLite/go.mod'
+        cache-dependency-path: 'AndroidLibXrayLite/go.sum'
+
+    - name: Build libv2ray (the Xray core) from the submodule
+      run: |
+        go install golang.org/x/mobile/cmd/gomobile@latest
+        export ANDROID_NDK_HOME=$NDK_HOME
+        cd AndroidLibXrayLite
+        bash gen_assets.sh download
+        gomobile init
+        gomobile bind -v -androidapi 24 -trimpath -ldflags='-s -w -buildid= -checklinkname=0' -o libv2ray.aar ./
+        mkdir -p ${{ github.workspace }}/V2rayNG/app/libs
+        cp libv2ray.aar ${{ github.workspace }}/V2rayNG/app/libs/
+        unzip -p libv2ray.aar classes.jar > "$RUNNER_TEMP/libv2ray-classes.jar"
+        unzip -l "$RUNNER_TEMP/libv2ray-classes.jar" | grep -q 'libv2ray/SocketProtector' || { echo "::error::libv2ray has no SocketProtector"; exit 1; }
 
     - name: Setup Java
       uses: actions/setup-java@v5
@@ -99,16 +113,61 @@ jobs:
 
     - name: Decode Keystore
       uses: timheuer/base64-to-file@v2.0.0
-      id: android_keystore
+      id: android_keystore           # the Ethavpn key: the direct APKs' original signer (and still theirs on Android 7-8)
       with:
         fileName: "android_keystore.jks"
         encodedString: ${{ secrets.APP_KEYSTORE_BASE64 }}
+
+    - name: Decode the Allion keystore
+      uses: timheuer/base64-to-file@v2.0.0
+      id: allion_keystore            # the Allion LLC key: Google Play's upload key; the direct APKs' signer on Android 9+
+      with:
+        fileName: "allion_keystore.jks"
+        encodedString: ${{ secrets.ALLION_KEYSTORE_BASE64 }}
 
     - name: Build the direct APKs and the Play bundle
       run: |
         cd ${{ github.workspace }}/V2rayNG
         ./gradlew licenseDirectReleaseReport
-        ./gradlew assembleDirectRelease bundlePlayRelease -Pandroid.injected.signing.store.file=${{ steps.android_keystore.outputs.filePath }} -Pandroid.injected.signing.store.password=${{ secrets.APP_KEYSTORE_PASSWORD }} -Pandroid.injected.signing.key.alias=${{ secrets.APP_KEYSTORE_ALIAS }} -Pandroid.injected.signing.key.password=${{ secrets.APP_KEY_PASSWORD }}
+        # the direct APKs: built with the Ethavpn key, then re-signed with the rotation in the next step
+        ./gradlew assembleDirectRelease -Pandroid.injected.signing.store.file=${{ steps.android_keystore.outputs.filePath }} -Pandroid.injected.signing.store.password=${{ secrets.APP_KEYSTORE_PASSWORD }} -Pandroid.injected.signing.key.alias=${{ secrets.APP_KEYSTORE_ALIAS }} -Pandroid.injected.signing.key.password=${{ secrets.APP_KEY_PASSWORD }}
+        # the Play bundle: the Allion key, Google Play's upload key
+        ./gradlew bundlePlayRelease -Pandroid.injected.signing.store.file=${{ steps.allion_keystore.outputs.filePath }} -Pandroid.injected.signing.store.password=${{ secrets.ALLION_KEYSTORE_PASSWORD }} -Pandroid.injected.signing.key.alias=${{ secrets.ALLION_KEY_ALIAS }} -Pandroid.injected.signing.key.password=${{ secrets.ALLION_KEY_PASSWORD }}
+
+    - name: Sign the direct APKs with key rotation (Ethavpn to Allion) and check both keys
+      env:
+        ETH_STORE_PASS: ${{ secrets.APP_KEYSTORE_PASSWORD }}
+        ETH_KEY_PASS: ${{ secrets.APP_KEY_PASSWORD }}
+        ALLION_STORE_PASS: ${{ secrets.ALLION_KEYSTORE_PASSWORD }}
+        ALLION_KEY_PASS: ${{ secrets.ALLION_KEY_PASSWORD }}
+      run: |
+        set -euo pipefail
+        AS=$ANDROID_HOME/build-tools/37.0.0/apksigner
+        OUT=${{ github.workspace }}/V2rayNG/app/build/outputs/apk/direct/release
+        ETH="--ks ${{ steps.android_keystore.outputs.filePath }} --ks-key-alias ${{ secrets.APP_KEYSTORE_ALIAS }} --ks-pass env:ETH_STORE_PASS --key-pass env:ETH_KEY_PASS"
+        ALLION="--ks ${{ steps.allion_keystore.outputs.filePath }} --ks-key-alias ${{ secrets.ALLION_KEY_ALIAS }} --ks-pass env:ALLION_STORE_PASS --key-pass env:ALLION_KEY_PASS"
+        # the keys this app has always been signed with; anything else fails the build
+        OLD=f7cb08e1fa300fca877ee03ee3f6f6b577af3850ddf551ceef23b5b11623f6fc   # Ethavpn, since 1.1.1
+        NEW=7174bbcda3e8378b40fb3c528fc84a03974ed2af09aabc97d0a3d357946b3653   # Allion LLC
+        # the proof that the Ethavpn key hands over to the Allion key: public certificates and the old key's signature
+        $AS rotate --out "$RUNNER_TEMP/skyray.lineage" --old-signer $ETH --new-signer $ALLION
+        $AS lineage --in "$RUNNER_TEMP/skyray.lineage" --print-certs
+        for f in "$OUT"/SkyRay_*.apk; do
+          $AS sign --in "$f" --out "$f.rotated" $ETH --next-signer $ALLION \
+            --lineage "$RUNNER_TEMP/skyray.lineage" --rotation-min-sdk-version 28
+          mv "$f.rotated" "$f"
+          # Android 7-8 (API 24-27) must see the Ethavpn key, Android 9+ the Allion key with the proof.
+          # (Output read into variables first: `| grep -q` under pipefail can fail a good build on SIGPIPE.)
+          OLD_SDK=$($AS verify --min-sdk-version 24 --max-sdk-version 27 --print-certs "$f" | tr '[:upper:]' '[:lower:]')
+          NEW_SDK=$($AS verify --min-sdk-version 28 --print-certs "$f" | tr '[:upper:]' '[:lower:]')
+          PROOF=$($AS lineage --in "$f" --print-certs | tr '[:upper:]' '[:lower:]')
+          # on failure the annotation carries apksigner's certificate lines (public; the job log needs a login)
+          digests() { printf '%s' "$1" | grep 'sha-256 digest' | sed -E 's/certificate //' | tr '\n' ';' || true; }
+          [[ "$OLD_SDK" == *"sha-256 digest: $OLD"* ]] || { echo "::error::$(basename "$f"): Android 7-8 do not see the Ethavpn key; apksigner: $(digests "$OLD_SDK")"; exit 1; }
+          [[ "$NEW_SDK" == *"sha-256 digest: $NEW"* ]] || { echo "::error::$(basename "$f"): Android 9+ do not see the Allion key; apksigner: $(digests "$NEW_SDK")"; exit 1; }
+          [[ "$PROOF" == *"$OLD"* && "$PROOF" == *"$NEW"* ]] || { echo "::error::$(basename "$f"): the rotation proof is missing a key; apksigner: $(digests "$PROOF")"; exit 1; }
+        done
+        echo "direct APKs: Ethavpn for Android 7-8, Allion (rotated from Ethavpn) for Android 9+"
 
     - name: Write latest.json and the signing certificate fingerprint
       run: |
@@ -126,17 +185,18 @@ jobs:
         jq -n --arg v "$VERSION" --argjson c "$CODE" --arg p "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg m "$MIN" --argjson n "$NOTES" --argjson a "$ASSETS" \
           '{version:$v, versionCode:$c, published:$p, min_supported:$m, notes:$n, assets:$a}' > latest.json
         cat latest.json
-        # the release certificate's SHA-256: goes into assetlinks.json on the server (App Links)
-        $ANDROID_HOME/build-tools/37.0.0/apksigner verify --print-certs SkyRay_${VERSION}_arm64-v8a.apk \
-          | grep -i 'SHA-256' | head -1 | sed -E 's/.*: *//' | tr 'a-f' 'A-F' | sed -E 's/(..)/\1:/g; s/:$//' > signing-cert-sha256.txt
-        echo "signing cert sha256: $(cat signing-cert-sha256.txt)"
+        # the release certificates' SHA-256, both (Ethavpn for Android 7-8, Allion for Android 9+): both go into
+        # assetlinks.json on the server (App Links); one per line
+        $ANDROID_HOME/build-tools/37.0.0/apksigner lineage --in SkyRay_${VERSION}_arm64-v8a.apk --print-certs \
+          | grep -i 'SHA-256 digest' | sed -E 's/.*: *//' | tr 'a-f' 'A-F' | sed -E 's/(..)/\1:/g; s/:$//' > signing-cert-sha256.txt
+        echo "signing cert sha256 (Android 7-8, then 9+): $(tr '\n' ' ' < signing-cert-sha256.txt)"
         # the Play bundle, next to the APKs (not in latest.json: the server never serves it)
         cp ${{ github.workspace }}/V2rayNG/app/build/outputs/bundle/playRelease/app-play-release.aab "SkyRay_${VERSION}_play.aab"
         echo "play bundle sha256: $(sha256sum SkyRay_${VERSION}_play.aab | cut -d' ' -f1)"
         echo "Play bundle SkyRay_${VERSION}_play.aab SHA-256: \`$(sha256sum SkyRay_${VERSION}_play.aab | cut -d' ' -f1)\`" >> $GITHUB_STEP_SUMMARY
         echo "### EthaVPN $VERSION" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY; cat latest.json >> $GITHUB_STEP_SUMMARY; echo '```' >> $GITHUB_STEP_SUMMARY
-        echo "Signing certificate SHA-256: \`$(cat signing-cert-sha256.txt)\`" >> $GITHUB_STEP_SUMMARY
+        echo "Signing certificates SHA-256 (Android 7-8, then 9+): \`$(tr '\n' ' ' < signing-cert-sha256.txt)\`" >> $GITHUB_STEP_SUMMARY
 
     - name: Upload APKs and metadata
       uses: actions/upload-artifact@v7

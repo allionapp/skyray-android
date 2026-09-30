@@ -512,7 +512,7 @@ object AngConfigManager {
             val subscriptions = MmkvManager.decodeSubscriptions()
             subscriptions.fold(SubscriptionUpdateResult()) { acc, subscription ->
                 acc + updateConfigViaSub(subscription)
-            }
+            }.also { EthaSubscription.mergeDuplicates() }   // after the loop: two copies may now share an address
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to update config via all subscriptions", e)
             SubscriptionUpdateResult()
@@ -540,6 +540,12 @@ object AngConfigManager {
                 return SubscriptionUpdateResult(skipCount = 1)
             }
 
+            // A link on an earlier EthaVPN address: fetch, and keep, the current one (the same account).
+            EthaSubscription.migratedUrl(it.subscription.url)?.let { next ->
+                LogUtil.i(AppConfig.TAG, "Subscription moves to the current link address")
+                it.subscription.url = next
+                MmkvManager.encodeSubscription(it.guid, it.subscription)
+            }
             val url = HttpUtil.toIdnUrl(it.subscription.url)
             if (!Utils.isValidUrl(url)) {
                 return SubscriptionUpdateResult(failureCount = 1)
@@ -645,12 +651,17 @@ object AngConfigManager {
      * @param url The URL.
      * @return The number of subscriptions imported.
      */
-    private fun importUrlAsSubscription(url: String): Int {
+    private fun importUrlAsSubscription(given: String): Int {
+        val url = EthaSubscription.migratedUrl(given) ?: given   // an earlier EthaVPN address: the current one
         val subscriptions = MmkvManager.decodeSubscriptions()
         subscriptions.forEach {
             if (it.subscription.url == url) {
                 return 0
             }
+        }
+        // The same account already there (another name after '#', or the old address): no second copy.
+        if (EthaSubscription.isSubLink(url) && subscriptions.any { EthaSubscription.sameAccount(it.subscription.url, url) }) {
+            return 0
         }
         val uri = URI(Utils.fixIllegalUrl(url))
         val subItem = SubscriptionItem()

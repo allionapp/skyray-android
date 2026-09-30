@@ -9,6 +9,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
+        <!-- SkyRay: no pre-releases and no GitHub; updates come from /dl/ only -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -17,7 +18,8 @@
             android:focusable="true"
             android:gravity="center|start"
             android:orientation="horizontal"
-            android:padding="@dimen/padding_spacing_dp16">
+            android:padding="@dimen/padding_spacing_dp16"
+            android:visibility="gone">
 
             <ImageView
                 android:layout_width="@dimen/image_size_dp24"

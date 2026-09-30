@@ -22,7 +22,7 @@ import com.v2ray.ang.util.LogUtil
 import java.lang.ref.WeakReference
 
 /**
- * The Google Play build's ad, as in SkyRay 1.0: a rewarded interstitial once after a fresh
+ * SkyRay's ad, in both builds (Google Play and the direct download), as in SkyRay 1.0: a rewarded interstitial once after a fresh
  * connect, and the connection lasts only if it is watched through. Closing it early ends the
  * connection; so does swiping the app away while it is still on screen (CoreVpnService reads
  * [AppConfig.PREF_SKYRAY_AD_SHOWN_AT]). When no ad could be loaded at all the connection is

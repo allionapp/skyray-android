@@ -63,46 +63,47 @@ object EthaSubscription {
     fun isStale(lastUpdated: Long, nowMs: Long = System.currentTimeMillis(), maxAgeMs: Long = AppConfig.ETHA_SUB_STALE_MS): Boolean =
         lastUpdated <= 0L || nowMs - lastUpdated >= maxAgeMs
 
-    /** An EthaVPN link: https, one of our hosts, exactly /sub/<token> (a fragment is fine, it names the profile). */
-    fun isSubLink(text: String?): Boolean {
-        val uri = try { URI(text?.trim() ?: return false) } catch (_: Exception) { return false }
-        val host = uri.host ?: return false
-        if (!"https".equals(uri.scheme, ignoreCase = true)) return false
-        if (AppConfig.ETHA_SUB_HOSTS.none { it.equals(host, ignoreCase = true) }) return false
-        val path = uri.path ?: return false
-        if (!path.startsWith(AppConfig.ETHA_SUB_PATH)) return false
+    /** An EthaVPN link: https, the link address (ETHA_SUB_HOSTS), exactly /sub/<token> (a fragment is fine, it names the profile). */
+    fun isSubLink(text: String?): Boolean = linkToken(text, AppConfig.ETHA_SUB_HOSTS) != null
+
+    /** The account token of one of our links (what stays when an address changes), else null. */
+    fun tokenOf(url: String?): String? = linkToken(url, AppConfig.ETHA_SUB_HOSTS)
+
+    /** The token of an https://<one of hosts>/sub/<token> link (a fragment is fine), else null. */
+    private fun linkToken(text: String?, hosts: List<String>): String? {
+        val uri = try { URI(text?.trim() ?: return null) } catch (_: Exception) { return null }
+        val host = uri.host ?: return null
+        if (!"https".equals(uri.scheme, ignoreCase = true)) return null
+        if (hosts.none { it.equals(host, ignoreCase = true) }) return null
+        val path = uri.path ?: return null
+        if (!path.startsWith(AppConfig.ETHA_SUB_PATH)) return null
         val token = path.substring(AppConfig.ETHA_SUB_PATH.length)
-        return token.length >= 8 && token.none { it == '/' }
-    }
-
-    /** The account an EthaVPN link names: its /sub/<token> path, the same on every host of the service. null for any other link. */
-    fun accountOf(link: String?): String? {
-        val bare = link?.substringBefore('#')?.trim() ?: return null
-        return if (isSubLink(bare)) URI(bare).path else null
-    }
-
-    /** Whether two links name the same account: the same link (its fragment aside), or one EthaVPN account on any of its hosts. */
-    fun sameAccount(a: String?, b: String?): Boolean {
-        val bareA = a?.substringBefore('#')?.trim().orEmpty()
-        val bareB = b?.substringBefore('#')?.trim().orEmpty()
-        if (bareA.isEmpty() || bareB.isEmpty()) return false
-        return bareA == bareB || accountOf(bareA)?.let { it == accountOf(bareB) } == true
+        return if (token.length >= 8 && token.none { it == '/' }) token else null
     }
 
     /**
-     * A link's host among ETHA_SUB_HOSTS: later ones are newer, and an account never moves back to
-     * an older one (the first is filtered in Iran). -1 for any other host.
+     * A link on an earlier address (ETHA_OLD_SUB_HOSTS) on the only one the app uses:
+     * https://<ETHA_SUB_HOST>/sub/<the same token>, the name after '#' kept. Anything else: null.
+     * The service answers every token on every address, so it is the same account.
      */
-    fun hostRank(link: String?): Int {
-        val host = try { URI(link?.substringBefore('#')?.trim() ?: return -1).host } catch (_: Exception) { null } ?: return -1
-        return AppConfig.ETHA_SUB_HOSTS.indexOfFirst { it.equals(host, ignoreCase = true) }
+    fun migratedUrl(url: String?): String? {
+        val token = linkToken(url, AppConfig.ETHA_OLD_SUB_HOSTS) ?: return null
+        val name = url!!.trim().substringAfter('#', "")
+        val next = "https://${AppConfig.ETHA_SUB_HOST}${AppConfig.ETHA_SUB_PATH}$token"
+        return if (name.isEmpty()) next else "$next#$name"
     }
 
-    /** The link inside pasted text (a Telegram message adds words and punctuation around it). */
+    /** Whether two links name the same account, whatever address or name either carries. */
+    fun sameAccount(a: String?, b: String?): Boolean {
+        val ta = tokenOf(migratedUrl(a) ?: a) ?: return false
+        return ta == tokenOf(migratedUrl(b) ?: b)
+    }
+
+    /** The link inside pasted text (a Telegram message adds words and punctuation around it); an earlier address comes back on the current one. */
     fun extractSubLink(text: String?): String? =
         text?.split(Regex("\\s+"))
             ?.map { it.trim().trimEnd('.', ',', ')', ']', '؛', '،') }
-            ?.firstOrNull { isSubLink(it) }
+            ?.firstNotNullOfOrNull { if (isSubLink(it)) it else migratedUrl(it) }
 
     /** Copies what the headers say onto the item. Returns true when at least one known header was present. */
     fun applyHeaders(sub: SubscriptionItem, headers: Map<String, String>): Boolean {
@@ -152,41 +153,11 @@ object EthaSubscription {
     }
 
     /**
-     * The link one account is stored under already when [link] names an older address of it (an
-     * old bot message in Telegram): Home tries that one first. null otherwise.
+     * The stored subscription of the account [link] names: the same EthaVPN account whatever address
+     * or name either carries (sameAccount), else the very same link (any other kind of link).
      */
-    fun newerStored(link: String): String? {
-        val account = accountOf(link) ?: return null
-        val rank = hostRank(link)
-        return all().map { it.subscription.url }
-            .filter { accountOf(it) == account && hostRank(it) > rank }
-            .maxByOrNull { hostRank(it) }
-    }
-
-    /**
-     * The same account on another of the service's hosts (the bot hands out a newer address once
-     * the old one is filtered): the stored link moves to [named] instead of a second copy of the
-     * account appearing. Returns the subscription's id and the link it had, so a move the new
-     * address does not answer can be undone with [setLink]; null when nothing moved. An older
-     * address gets here only when the newer stored one did not work ([newerStored]).
-     */
-    fun moveToHost(named: String): Pair<String, String>? {
-        val account = accountOf(named) ?: return null
-        val bare = named.substringBefore('#').trim()
-        val subs = MmkvManager.decodeSubscriptions()
-        if (subs.any { it.subscription.url.substringBefore('#').trim() == bare }) return null   // this very link is here already
-        // Only a link in use (enabled): a disabled one is never refreshed, so the move would always read "not working".
-        val same = subs.firstOrNull { it.subscription.enabled && accountOf(it.subscription.url) == account } ?: return null
-        val old = same.subscription.url
-        setLink(same.guid, named)
-        return same.guid to old
-    }
-
-    fun setLink(subId: String, url: String) {
-        val item = MmkvManager.decodeSubscription(subId) ?: return
-        item.url = url
-        MmkvManager.encodeSubscription(subId, item)
-    }
+    fun findAccount(link: String): SubscriptionCache? =
+        MmkvManager.decodeSubscriptions().firstOrNull { sameAccount(it.subscription.url, link) } ?: findByLink(link)
 
     /** The name a link goes by in the list: the API's title, else its remark. */
     fun label(sub: SubscriptionCache): String =
@@ -213,6 +184,46 @@ object EthaSubscription {
             MmkvManager.encodeSettings(AppConfig.PREF_ETHA_PINNED, false)
             MmkvManager.encodeSettings(AppConfig.PREF_ETHA_LAST_TEST, 0L)
         }
+    }
+
+    /**
+     * Every stored link on an earlier address moves to the current one (migratedUrl), then copies of one
+     * account fold into one (mergeDuplicates). Home runs it whenever it looks for the subscription, so a
+     * phone moves when it first opens this version (a fetch moves its own link too). True when something changed.
+     */
+    fun migrateAll(): Boolean {
+        var changed = false
+        MmkvManager.decodeSubscriptions().forEach { s ->
+            migratedUrl(s.subscription.url)?.let { next ->
+                s.subscription.url = next
+                MmkvManager.encodeSubscription(s.guid, s.subscription)
+                changed = true
+            }
+        }
+        return mergeDuplicates() || changed
+    }
+
+    /**
+     * One subscription per account: a phone that holds the old and the new link of the same account
+     * (the new one tapped beside the old before this version) keeps the one with the selected server,
+     * else the first; the others go with their servers. Never call it inside a loop over the
+     * subscriptions. True when something changed.
+     */
+    fun mergeDuplicates(): Boolean {
+        var changed = false
+        MmkvManager.decodeSubscriptions()
+            .filter { tokenOf(it.subscription.url) != null }
+            .groupBy { tokenOf(it.subscription.url) }
+            .values.filter { it.size > 1 }
+            .forEach { same ->
+                val keep = same.firstOrNull { selectedIsIn(it.guid) } ?: same.first()
+                same.filter { it.guid != keep.guid }.forEach {
+                    SubscriptionUpdater.cancelOne(subId = it.guid)
+                    MmkvManager.removeSubscription(it.guid)
+                }
+                changed = true
+            }
+        return changed
     }
 
     /**

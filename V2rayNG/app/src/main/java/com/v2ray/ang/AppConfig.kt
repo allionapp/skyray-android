@@ -127,22 +127,27 @@ object AppConfig {
     const val UPSTREAM_URL = "$GITHUB_URL/2dust/v2rayNG"
     const val TG_CHANNEL_URL = "https://t.me/vpnandfree"
 
-    /** EthaVPN: the service this build (the SkyRay app) is made for. Its links come from any of these
-     *  hosts, all the same service, oldest first: mobileiphone.org is filtered in Iran; mobileiphonez.org
-     *  is the CDN-fronted domain (also the app's downloads); skyrayconfig.org serves only the links and
-     *  is where an account ends up. The App Links filter in AndroidManifest.xml lists the same hosts. */
-    const val ETHA_SUB_HOST = "fra.mobileiphone.org"
-    val ETHA_SUB_HOSTS = listOf(ETHA_SUB_HOST, "fra.mobileiphonez.org", "fra.skyrayconfig.org")
+    /**
+     * EthaVPN: the service this build (the SkyRay app) is made for. Its links come from one address only,
+     * fra.skyrayconfig.org (a link-only domain, since 2026-09-29). A link on an earlier address
+     * (ETHA_OLD_SUB_HOSTS) is never used as is: it becomes https://fra.skyrayconfig.org/sub/<the same token>
+     * (EthaSubscription.migratedUrl) — the phone's stored link on first open or its next refresh, and a
+     * pasted, scanned or tapped one before it is saved. The tunnels' address comes from the subscription.
+     */
+    const val ETHA_SUB_HOST = "fra.skyrayconfig.org"
+    val ETHA_SUB_HOSTS = listOf(ETHA_SUB_HOST)
+    val ETHA_OLD_SUB_HOSTS = listOf("fra.mobileiphonez.org", "fra.mobileiphone.org")
     const val ETHA_SUB_PATH = "/sub/"
     const val ETHA_SUB_NAME = "EthaVPN"
     const val ETHA_USER_AGENT = "SkyRay/${BuildConfig.VERSION_NAME} (android)"   // how the server knows this app fetched
     const val ETHA_SUB_UPDATE_MINUTES = 180L                 // = the API's Profile-Update-Interval: 3 h (the header wins after the first fetch)
     const val ETHA_SUB_STALE_MS = 3_600_000L                 // on open: refresh the subscription quietly when its last fetch is older than this
-    // The app's own updates (/dl/ on the service), not the link. Android direct downloads come from
-    // fra.mobileiphonez.org/dl/ only (mobileiphone.org is filtered in Iran): latest.json and the APK.
+    // The app's own updates (/dl/ on the service), not the link: this one address only (operator's rule) —
+    // no fallback host, no GitHub. latest.json and the APK both come from here, and the APK must match the
+    // sha256 latest.json names. (1.2.2 fell back to fra.mobileiphone.org, 1.1.5 and older read only that;
+    // the server keeps serving /dl/ there for them.)
     const val ETHA_DL_HOST = "fra.mobileiphonez.org"
     const val ETHA_DOWNLOAD_BASE = "https://$ETHA_DL_HOST/dl/"
-    val ETHA_DOWNLOAD_BASES = listOf(ETHA_DOWNLOAD_BASE)
     const val ETHA_BOT_URL = "https://t.me/Ethaconfigbot"
     const val ETHA_RENEW_URL = "$ETHA_BOT_URL?start=app_renew"
     const val ETHA_SUPPORT_URL = "$ETHA_BOT_URL?start=app_support"
@@ -151,7 +156,7 @@ object AppConfig {
     const val ETHA_WATCHDOG_FAILURES = 2                     // consecutive failed probes before switching lines
     const val ETHA_DELAY_FRESH_MS = 600_000L                 // real-delay results younger than this are reused on Connect
     const val ETHA_UPDATE_CHECK_MS = 86_400_000L             // ask /dl/latest.json at most once a day
-    const val PREF_SKYRAY_AD_SHOWN_AT = "pref_skyray_ad_shown_at"   // a rewarded ad is on screen since then (0 = none); Play build only
+    const val PREF_SKYRAY_AD_SHOWN_AT = "pref_skyray_ad_shown_at"   // a rewarded ad is on screen since then (0 = none)
     const val PREF_ETHA_PINNED = "pref_etha_pinned"          // a line chosen by hand: no auto-select, no auto-switch
     const val PREF_ETHA_EXPERT = "pref_etha_expert"          // seven taps on the version: the v2rayNG UI appears in Settings
     const val PREF_ETHA_LAST_TEST = "pref_etha_last_test"
