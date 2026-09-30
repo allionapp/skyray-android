@@ -99,7 +99,7 @@ jobs:
         unzip -l "$RUNNER_TEMP/libv2ray-classes.jar" | grep -q 'libv2ray/SocketProtector' || { echo "::error::libv2ray has no SocketProtector"; exit 1; }
 
     - name: Setup Java
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@v6
       with:
         distribution: 'temurin'
         java-version: '21'
