@@ -41,6 +41,12 @@ class EthaSettingsActivity : BaseActivity() {
         binding.layoutLanguage.setOnClickListener { pickLanguage() }
         binding.layoutUpdate.setOnClickListener { Updates.open(this) }
         binding.layoutLogs.setOnClickListener { startActivity(Intent(this, LogcatActivity::class.java)) }
+        binding.layoutShare.setOnClickListener {
+            // the system share sheet with the two stores and the bot: a friend picks their platform
+            val text = getString(R.string.etha_share_text, AppConfig.ETHA_PLAY_URL, AppConfig.ETHA_APPSTORE_URL, AppConfig.ETHA_SHARE_URL)
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+            startActivity(Intent.createChooser(send, getString(R.string.etha_share_app)))
+        }
         binding.layoutAbout.setOnClickListener { startActivity(Intent(this, AboutActivity::class.java)) }
         binding.layoutPrivacy.setOnClickListener { Utils.openUri(this, AppConfig.ETHA_PRIVACY_URL) }
         binding.layoutDelete.setOnClickListener { confirmDelete() }

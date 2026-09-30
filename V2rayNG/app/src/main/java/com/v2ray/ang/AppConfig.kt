@@ -151,6 +151,10 @@ object AppConfig {
     const val ETHA_BOT_URL = "https://t.me/Ethaconfigbot"
     const val ETHA_RENEW_URL = "$ETHA_BOT_URL?start=app_renew"
     const val ETHA_SUPPORT_URL = "$ETHA_BOT_URL?start=app_support"
+    // "Share this app" (Settings): the two stores and the bot, the bot link with its own registry code
+    const val ETHA_SHARE_URL = "$ETHA_BOT_URL?start=app_share"
+    const val ETHA_PLAY_URL = "https://play.google.com/store/apps/details?id=com.allion.skyray"
+    const val ETHA_APPSTORE_URL = "https://apps.apple.com/app/id6809038308"
     const val ETHA_PRIVACY_URL = "https://allionapp.com/skyray-privacy"   // the store listing's privacy policy
     const val ETHA_WATCHDOG_INTERVAL_MS = 180_000L           // probe the tunnel every 3 minutes while connected
     const val ETHA_WATCHDOG_FAILURES = 2                     // consecutive failed probes before switching lines

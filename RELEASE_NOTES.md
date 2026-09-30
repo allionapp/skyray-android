@@ -1,1 +1,1 @@
-Ping all shows every result as it lands. Your server changes only when you connect or pick one: a test never moves a live connection; if a faster line appears, the app says so.
+Settings has Share this app: send a friend the Google Play, App Store and Telegram links in one message.
