@@ -503,7 +503,7 @@ class HomeActivity : HelperBaseActivity() {
         if (System.currentTimeMillis() - last < AppConfig.ETHA_UPDATE_CHECK_MS) return
         lifecycleScope.launch {
             try {
-                val result = UpdateCheckerManager.checkForUpdate(false)
+                val result = UpdateCheckerManager.checkForUpdate()
                 MmkvManager.encodeSettings(AppConfig.PREF_ETHA_LAST_UPDATE_CHECK, System.currentTimeMillis())
                 if (result.hasUpdate) {
                     updateResult = result

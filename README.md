@@ -45,8 +45,8 @@ download from anywhere else. The APK signing certificate's SHA-256 is in every r
   as soon as the link is imported, plus a silent refresh when the screen comes up after an hour.
 - Auto-select on Connect (`AutoSelect`) and a watchdog while connected that switches lines
   after two failed probes (`CoreServiceManager`), unless the customer keeps a line pinned.
-- Updates from the service's own `/dl/latest.json`, verified by sha256 before install
-  (`UpdateCheckerManager`, `CheckUpdateActivity`); GitHub releases as the fallback.
+- Updates from the service's own `/dl/latest.json` on `fra.mobileiphonez.org` only, verified by sha256
+  before install (`UpdateCheckerManager`, `CheckUpdateActivity`); no other address, no GitHub fallback.
 - Defaults for Iran: the Iran routing preset, Iranian geo files, a domestic resolver for the
   direct-routed traffic, no fragment, no mux; `EthaVPN/<version> (android)` User-Agent.
 

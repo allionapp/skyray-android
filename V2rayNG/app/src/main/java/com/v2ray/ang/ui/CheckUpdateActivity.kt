@@ -18,12 +18,10 @@ import com.v2ray.ang.dto.UrlContentRequest
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
-import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.UpdateCheckerManager
 import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.LogUtil
-import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -39,28 +37,23 @@ class CheckUpdateActivity : BaseActivity() {
         setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.update_check_for_update))
 
         binding.layoutCheckUpdate.setOnClickListener {
-            checkForUpdates(binding.checkPreRelease.isChecked)
+            checkForUpdates()
         }
-
-        binding.checkPreRelease.setOnCheckedChangeListener { _, isChecked ->
-            MmkvManager.encodeSettings(AppConfig.PREF_CHECK_UPDATE_PRE_RELEASE, isChecked)
-        }
-        binding.checkPreRelease.isChecked = MmkvManager.decodeSettingsBool(AppConfig.PREF_CHECK_UPDATE_PRE_RELEASE, false)
 
         "v${BuildConfig.VERSION_NAME} (${CoreNativeManager.getLibVersion()})".also {
             binding.tvVersion.text = it
         }
 
-        checkForUpdates(binding.checkPreRelease.isChecked)
+        checkForUpdates()
     }
 
-    private fun checkForUpdates(includePreRelease: Boolean) {
+    private fun checkForUpdates() {
         toast(R.string.update_checking_for_update)
         showLoading()
 
         lifecycleScope.launch {
             try {
-                val result = UpdateCheckerManager.checkForUpdate(includePreRelease)
+                val result = UpdateCheckerManager.checkForUpdate()
                 if (result.hasUpdate) {
                     showUpdateDialog(result)
                 } else {
@@ -91,12 +84,12 @@ class CheckUpdateActivity : BaseActivity() {
     /**
      * Downloads the APK from the service's own host (direct, then through the local proxy when
      * the tunnel is up), checks its sha256 against latest.json and hands it to the installer.
-     * A GitHub fallback result has no sha256: the browser downloads it, as upstream did.
+     * Nothing without a sha256 is downloaded or installed.
      */
     private fun downloadAndInstall(result: CheckUpdateResult) {
         val url = result.downloadUrl ?: return
         if (result.sha256.isNullOrEmpty()) {
-            Utils.openUri(this, url)
+            toastError(R.string.etha_update_verify_failed)
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
