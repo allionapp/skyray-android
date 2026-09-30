@@ -1,4 +1,4 @@
-# Releasing EthaVPN for Android
+# Releasing SkyRay for Android
 
 ## Once: keys and secrets (the operator, off the server)
 
@@ -24,12 +24,13 @@
    (the armored secret key), and `GPG_PASSPHRASE` when the GPG key has one (leave it out for a key
    without a passphrase).
 4. **Deploy key** for the server's working copy (`/opt/ethavpn-app`, remote `github`), like the
-   other three repos: `ssh-keygen -t ed25519 -f /root/.ssh/gh-ethavpn-app -N ''`, add the public
+   server's other repos: `ssh-keygen -t ed25519 -f /root/.ssh/gh-ethavpn-app -N ''`, add the public
    key as a deploy key with write access, alias `gh-ethavpn-app` in `/root/.ssh/config`.
 
 ## Every release
 
-1. In `V2rayNG/app/build.gradle.kts` bump `versionCode` (+1) and `versionName` (semver). If old
+1. In `V2rayNG/app/build.gradle.kts` bump `versionName` (semver) and `versionCode` (4000000 + the version's
+   digits: 1.2.3 → 4000123; it must also be above anything ever uploaded to Google Play). If old
    versions must stop working (a server-side change they cannot follow), raise
    `min_supported.txt` to the lowest version that still works — the app then insists on the
    update. Write two lines in `RELEASE_NOTES.md` (shown in the update dialog).
@@ -38,7 +39,7 @@
    ```bash
    git tag vX.Y.Z && git push github vX.Y.Z
    ```
-   Actions → Build APK → Run workflow → `release_tag` = `vX.Y.Z`. The release gets
+   Actions → **Build APK and Play bundle** → Run workflow → `release_tag` = `vX.Y.Z`. The release gets
    `SkyRay_X.Y.Z_<abi>.apk` (+ `.sig`), `SkyRay_X.Y.Z_play.aab` (+ `.sig`, the Google Play bundle — see
    below), `latest.json` (+ `.sig`), `ethavpn-release-key.asc`,
    `release-key-fingerprint.txt`, `signing-cert-sha256.txt`.
@@ -61,10 +62,9 @@
   seeing the Ethavpn signature. The build fails unless every APK shows exactly that.
 - **Keep both keystores and their passwords forever** (encrypted, off the server). The Ethavpn key still
   signs for Android 7–8 and the proof: losing it breaks updates on those phones. Never rotate back.
-- **Before the first rotated release:** install a push build's arm64 APK (Actions → the run →
-  `release-files`) over SkyRay 1.1.5 from `/dl/` on an Android 9+ phone, and on Android 7–8 if one is at
-  hand: it must offer **Update** and keep the imported link. Upload that run's bundle to Play's internal
-  testing track: Play must accept it.
+- **1.2.2 (2026-09-29) was the first rotated release.** Before any release, install the push build's arm64 APK
+  (Actions → the run → `release-files`) over the served version on a phone: it must offer **Update** and keep
+  the imported link.
 - **If Play answers "signed with the wrong key"**, Play still expects the old upload key: Play Console →
   App integrity → App signing → **Request upload key reset**, with the Allion certificate
   (`keytool -export -rfc -keystore skyray-release.jks -alias skyray -file upload_certificate.pem`, on
@@ -77,13 +77,10 @@ with the Allion LLC key (Play's upload key; see **Signing keys**): no in-app upd
 update row opens the Play listing, the same versionCode as the APKs (4000000 + build number) so a phone
 can move between a direct install and a Play install. Nothing on the server touches it: download it from
 the GitHub release page and upload it in the Play Console (Release → a testing track or Production →
-Create new release). Before the **first** upload decide the signing key (Play Console → App integrity →
-App signing): "Export and upload a key from a Java keystore" with the release keystore keeps one
-signature for Play and direct installs (the PEPK tool runs on the operator's machine, never on the
-server); letting Google generate the key means Play installs carry Google's certificate — then add its
-SHA-256 (the App signing page) to `/var/www/html/.well-known/assetlinks.json` next to the release one,
-or the link stops opening the Play-installed app. Listing texts, graphics and the console checklist:
-`store/play/`.
+Create new release). Play App Signing re-signs what it installs with Google's key, so Play installs carry
+Google's certificate, not the upload key's: its SHA-256 (the App signing page, or read off a Play-installed
+phone) must be in `/var/www/html/.well-known/assetlinks.json` next to the Ethavpn and Allion ones, or the link
+stops opening the Play-installed app. Listing texts, graphics and the console checklist: `store/play/`.
 
 ## Rolling back
 
