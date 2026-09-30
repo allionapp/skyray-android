@@ -520,6 +520,7 @@
     <string name="etha_server_pick">Выбор сервера</string>
     <string name="etha_test_again">Пинг всех</string>
     <string name="etha_ping_best">Самый быстрый сейчас: %s</string>
+    <string name="etha_ping_faster">Самый быстрый сейчас: %s — переподключитесь, чтобы перейти на него</string>
     <string name="etha_ping_kept">%s остаётся — выберите Авто, чтобы переключаться на самый быстрый</string>
     <string name="etha_ping_untested">не проверен</string>
     <string name="etha_ping_failed">ошибка</string>

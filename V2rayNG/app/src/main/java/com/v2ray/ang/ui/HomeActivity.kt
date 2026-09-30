@@ -113,31 +113,30 @@ class HomeActivity : HelperBaseActivity() {
             if (running) mainViewModel.testCurrentServerRealPing()
         }
         mainViewModel.updateTestResultAction.observe(this) { binding.tvLine.text = lineText(it) }
+        // every ping lands in the list as it is measured (the results are cleared when a test starts)
+        mainViewModel.updateListAction.observe(this) { renderServerDropdown(sub?.guid) }
         mainViewModel.testsFinished.observe(this) {
             AutoSelect.markTested()
             if (pendingConnect) {
                 pendingConnect = false
                 connectWithBest()
             } else {
-                // Auto means the best line of the latest test: re-pick, and move over if connected. Either way
-                // the customer hears the outcome (a "Ping all" that changes nothing visible looked broken).
+                // The line changes only when the customer connects (Auto picks the fastest then) or picks one by
+                // hand: a test never moves a live connection (operator's rule, 2026-09-30). Auto and disconnected:
+                // the selection moves to the best so the next Connect uses it. Either way the outcome is said —
+                // a "Ping all" that changes nothing visible looked broken.
                 val s = sub
                 if (s != null && !isPinned()) {
                     val best = AutoSelect.pickBest(s.guid)
-                    if (best != null && best != MmkvManager.getSelectServer()) {
-                        MmkvManager.setSelectServer(best)
-                        if (mainViewModel.isRunning.value == true) {
-                            connecting = true
-                            CoreServiceManager.stopVService(this)
-                            lifecycleScope.launch {
-                                delay(700)
-                                connecting = false
-                                startVpnFlow()
-                            }
-                        }
-                    }
+                    val running = mainViewModel.isRunning.value == true
+                    val moved = best != null && best != MmkvManager.getSelectServer()
+                    if (moved && !running) MmkvManager.setSelectServer(best!!)
                     val name = best?.let { MmkvManager.decodeServerConfig(it)?.remarks }?.let { ServerPicker.displayName(it) }
-                    if (name != null) toastSuccess(getString(R.string.etha_ping_best, name)) else toastError(R.string.etha_no_line)
+                    when {
+                        name == null -> toastError(R.string.etha_no_line)
+                        moved && running -> toastSuccess(getString(R.string.etha_ping_faster, name))
+                        else -> toastSuccess(getString(R.string.etha_ping_best, name))
+                    }
                 } else if (s != null) {
                     val kept = MmkvManager.getSelectServer()?.let { MmkvManager.decodeServerConfig(it)?.remarks }?.let { ServerPicker.displayName(it) }
                     if (kept != null) toast(getString(R.string.etha_ping_kept, kept))
@@ -271,6 +270,7 @@ class HomeActivity : HelperBaseActivity() {
         if (MmkvManager.decodeServerList(s.guid).isEmpty()) return
         toast(R.string.etha_state_finding)
         mainViewModel.testAllRealPing()
+        render()   // the cleared results show at once; each ping fills in as it lands
     }
 
     private fun lineText(latency: String?): String {

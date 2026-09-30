@@ -1,1 +1,1 @@
-Ping all: the button measures every server and says what it found — the fastest line (and moves to it in Auto), or that your picked server stays. Same as the iPhone app.
+Ping all shows every result as it lands. Your server changes only when you connect or pick one: a test never moves a live connection; if a faster line appears, the app says so.

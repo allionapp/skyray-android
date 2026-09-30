@@ -499,6 +499,7 @@
     <string name="etha_server_pick">انتخاب سرور</string>
     <string name="etha_test_again">پینگ همه</string>
     <string name="etha_ping_best">سریع‌ترین حالا: %s</string>
+    <string name="etha_ping_faster">سریع‌ترین حالا: %s؛ برای رفتن به آن، دوباره وصل شوید</string>
     <string name="etha_ping_kept">سرور %s می‌ماند؛ برای رفتن به سریع‌ترین، «خودکار» را انتخاب کنید</string>
     <string name="etha_ping_untested">آزمایش نشده</string>
     <string name="etha_ping_failed">ناموفق</string>
