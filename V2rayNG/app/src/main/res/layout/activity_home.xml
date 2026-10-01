@@ -277,7 +277,7 @@
                     android:layout_weight="1"
                     android:text="@string/etha_renew" />
 
-                <Space android:layout_width="10dp" android:layout_height="1dp" />
+                <Space android:id="@+id/space_renew" android:layout_width="10dp" android:layout_height="1dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_support"

@@ -160,6 +160,7 @@ object AppConfig {
     const val ETHA_WATCHDOG_FAILURES = 2                     // consecutive failed probes before switching lines
     const val ETHA_DELAY_FRESH_MS = 600_000L                 // real-delay results younger than this are reused on Connect
     const val ETHA_UPDATE_CHECK_MS = 86_400_000L             // ask /dl/latest.json at most once a day
+    const val PREF_SKYRAY_AD_SHOWN_AT = "pref_skyray_ad_shown_at"   // a rewarded ad is on screen since then (0 = none)
     const val PREF_ETHA_PINNED = "pref_etha_pinned"          // a line chosen by hand: no auto-select, no auto-switch
     const val PREF_ETHA_EXPERT = "pref_etha_expert"          // seven taps on the version: the v2rayNG UI appears in Settings
     const val PREF_ETHA_LAST_TEST = "pref_etha_last_test"

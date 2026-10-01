@@ -5,6 +5,7 @@ import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.os.LocaleList
+import com.v2ray.ang.handler.AdSignalOverride
 import java.util.Locale
 
 open class MyContextWrapper(base: Context?) : ContextWrapper(base) {
@@ -25,6 +26,8 @@ open class MyContextWrapper(base: Context?) : ContextWrapper(base) {
             configuration.setLocale(locale)
             val localeList = LocaleList(locale)
             LocaleList.setDefault(localeList)
+            // That also reset the process locale, which the ad signals may be holding at the exit's.
+            AdSignalOverride.reassert()
             configuration.setLocales(localeList)
 
             mContext = mContext.createConfigurationContext(configuration)

@@ -545,6 +545,9 @@
     <string name="etha_updated">Updated %s</string>
     <string name="etha_updated_never">Not updated yet</string>
     <string name="etha_privacy_policy">Privacy policy</string>
+    <string name="etha_privacy_choices">Privacy choices</string>
+    <string name="etha_privacy_choices_hint">Change what you agreed to for ads</string>
+    <string name="etha_privacy_choices_connect">Connect first, then open Privacy choices.</string>
     <string name="etha_delete_account">Delete account</string>
     <string name="etha_delete_account_hint">Removes your subscription and all its data from this phone</string>
     <string name="etha_delete_account_confirm">Your subscription, its servers and all account data are removed from this phone. Your link in Telegram keeps working, so you can add it again any time.</string>
@@ -557,6 +560,8 @@
 
     <string name="etha_tap_to_connect">Tap to connect</string>
     <string name="etha_tap_to_disconnect">Tap to disconnect</string>
+    <string name="skyray_ad_required">The connection needs the short ad watched through to the end. Tap connect and let it finish.</string>
+    <string name="skyray_ad_hint">Free to use — a short ad plays once you connect</string>
     <string name="etha_days_label">days left</string>
     <string name="etha_data_label_of">of %s used</string>
     <string name="etha_auto_picked">Auto · %s</string>

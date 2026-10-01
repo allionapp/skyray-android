@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration.UI_MODE_NIGHT_MASK
+import android.content.res.Resources
 import android.content.res.Configuration.UI_MODE_NIGHT_NO
 import android.os.Build
 import android.os.LocaleList
@@ -455,7 +456,9 @@ object Utils {
      *
      * @return The system locale.
      */
-    fun getSysLocale(): Locale = LocaleList.getDefault().get(0) ?: Locale.getDefault()
+    // The device's own language, from the system configuration rather than the process default,
+    // which AdSignalOverride may be holding at the tunnel exit's while connected.
+    fun getSysLocale(): Locale = Resources.getSystem().configuration.locales.get(0) ?: Locale.getDefault()
 
     /**
      * Fix illegal characters in a URL.

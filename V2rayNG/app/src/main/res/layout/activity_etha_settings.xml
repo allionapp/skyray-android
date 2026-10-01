@@ -87,6 +87,17 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/layout_privacy_choices"
+            style="@style/EthaSettingsRow"
+            android:visibility="gone">
+            <ImageView style="@style/EthaSettingsIcon" app:srcCompat="@drawable/ic_privacy_24dp" />
+            <LinearLayout style="@style/EthaSettingsText">
+                <TextView style="@style/EthaSettingsTitle" android:text="@string/etha_privacy_choices" />
+                <TextView style="@style/EthaSettingsSummary" android:text="@string/etha_privacy_choices_hint" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/layout_delete"
             style="@style/EthaSettingsRow">
             <ImageView style="@style/EthaSettingsIcon" app:srcCompat="@drawable/ic_delete_24dp" />

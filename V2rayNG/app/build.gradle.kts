@@ -1,10 +1,40 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("com.jaredsburrows.license")
 }
 
+// The Play bundle is signed with SkyRay's upload key — the key Google Play knows, the same the owner
+// signs with — whenever its settings file is present: V2rayNG/keystore.properties, or the file named
+// by -Pskyray.keystore=<path>. Keys: storeFile (next to that file), storePassword, keyAlias,
+// keyPassword. Neither file is ever in git. Without it the bundle comes out unsigned, for CI to sign.
+val uploadKeyFile: File? = ((findProperty("skyray.keystore") as String?)?.let { file(it) }
+    ?: rootProject.file("keystore.properties")).takeIf { it.exists() }
+val uploadKey: Properties? = uploadKeyFile?.let { f -> Properties().apply { f.inputStream().use { load(it) } } }
+
 android {
+    signingConfigs {
+        if (uploadKey != null) {
+            create("upload") {
+                val store = uploadKey.getProperty("storeFile")
+                // Next to the settings file; app/ too, where the owner's older project keeps it.
+                storeFile = listOf(File(store), File(uploadKeyFile!!.parentFile, store), File(uploadKeyFile.parentFile, "app/$store"))
+                    .firstOrNull { it.isAbsolute && it.exists() }
+                    ?: error("SkyRay upload key: $store not found next to $uploadKeyFile")
+                storePassword = uploadKey.getProperty("storePassword")
+                keyAlias = uploadKey.getProperty("keyAlias")
+                keyPassword = uploadKey.getProperty("keyPassword")
+            }
+        }
+    }
+
+    // Only the languages the app itself is translated into. Libraries bring dozens more, and
+    // Google Play refuses a bundle whose "he" it cannot handle for translation.
+    androidResources {
+        localeFilters += listOf("en", "ar", "bn", "bqi-rIR", "fa", "ru", "vi", "zh-rCN", "zh-rTW")
+    }
     namespace = "com.v2ray.ang"
     compileSdk = 37
 
@@ -17,7 +47,7 @@ android {
         targetSdk = 37
         // 4000000 + the build number: the same code in every ABI split and in the Play bundle, so a
         // phone can move between the direct APK and the Play install (the updater compares versionName).
-        versionCode = 4000133
+        versionCode = 4000134
         versionName = "1.3.3"
         multiDexEnabled = true
         manifestPlaceholders["subHost"] = "fra.skyrayconfig.org"   // AppConfig.ETHA_SUB_HOST: the only link address
@@ -69,6 +99,7 @@ android {
         create("play") {
             dimension = "distribution"
             buildConfigField("String", "DISTRIBUTION", "\"Play\"")
+            if (uploadKey != null) signingConfig = signingConfigs.getByName("upload")
         }
     }
 
@@ -116,6 +147,12 @@ android {
 }
 
 dependencies {
+    // The Google Play build's ad (AdsGate in src/play); the direct build has none.
+    "playImplementation"("com.google.android.gms:play-services-ads:23.6.0")
+    "playImplementation"("com.google.android.ump:user-messaging-platform:3.1.0")
+    // The ads SDK brings Guava at runtime only, which leaves WorkManager's ListenableFuture
+    // resolved to Guava's empty stub at compile time; the same version, made visible.
+    "playImplementation"("com.google.guava:guava:31.1-android")
     // Core Libraries
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
 

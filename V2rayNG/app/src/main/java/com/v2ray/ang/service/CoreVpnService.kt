@@ -21,6 +21,7 @@ import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.contracts.ServiceControl
 import com.v2ray.ang.contracts.Tun2SocksControl
 import com.v2ray.ang.core.CoreServiceManager
+import com.v2ray.ang.handler.TunnelSelf
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.NotificationManager
 import com.v2ray.ang.handler.SettingsManager
@@ -80,6 +81,21 @@ class CoreVpnService : VpnService(), ServiceControl {
         val policy = StrictMode.ThreadPolicy.Builder().permitAll().build()
         StrictMode.setThreadPolicy(policy)
         CoreServiceManager.serviceControl = SoftReference(this)
+    }
+
+    /**
+     * The app was swiped away while a rewarded ad was still on screen (the flag
+     * is never set otherwise): the connection it was paying for ends with it. A stale flag from
+     * a process that died is ignored after ten minutes, longer than any ad runs.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        val shownAt = MmkvManager.decodeSettingsLong(AppConfig.PREF_SKYRAY_AD_SHOWN_AT, 0L)
+        if (shownAt > 0 && System.currentTimeMillis() - shownAt < 10 * 60 * 1000L) {
+            MmkvManager.encodeSettings(AppConfig.PREF_SKYRAY_AD_SHOWN_AT, 0L)
+            LogUtil.i(AppConfig.TAG, "StartCore-VPN: app left with the ad unfinished; stopping")
+            stopAllService()
+        }
     }
 
     override fun onRevoke() {
@@ -206,6 +222,9 @@ class CoreVpnService : VpnService(), ServiceControl {
         try {
             mInterface = builder.establish()!!
             isRunning = true
+            // Before the core starts: every socket it dials stays out of this tunnel.
+            TunnelSelf.vpnService = this
+            TunnelSelf.installProtector()
             return true
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to establish VPN interface", e)
@@ -298,23 +317,33 @@ class CoreVpnService : VpnService(), ServiceControl {
      */
     private fun configurePerAppProxy(builder: Builder) {
         val selfPackageName = BuildConfig.APPLICATION_ID
+        // SkyRay keeps the app inside its own tunnel (see TunnelSelf): the core's sockets
+        // are protected instead. The VPN stays non-bypassable, so no other app — Google Play
+        // services among them — can bind its way around it to the real network.
+        val selfInside = TunnelSelf.wanted
 
         // If per-app proxy is not enabled, disallow the VPN service's own package and return
         if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PER_APP_PROXY) == false) {
-            builder.addDisallowedApplication(selfPackageName)
+            if (!selfInside) builder.addDisallowedApplication(selfPackageName)
             return
         }
 
         // If no apps are selected, disallow the VPN service's own package and return
         val apps = MmkvManager.decodeSettingsStringSet(AppConfig.PREF_PER_APP_PROXY_SET)
         if (apps.isNullOrEmpty()) {
-            builder.addDisallowedApplication(selfPackageName)
+            if (!selfInside) builder.addDisallowedApplication(selfPackageName)
             return
         }
 
         val bypassApps = MmkvManager.decodeSettingsBool(AppConfig.PREF_BYPASS_APPS)
-        // Handle the VPN service's own package according to the mode
-        if (bypassApps) apps.add(selfPackageName) else apps.remove(selfPackageName)
+        // Handle the VPN service's own package according to the mode. Kept inside (TunnelSelf),
+        // it is left off the bypass list and put on the allow list; otherwise, as in v2rayNG,
+        // it goes around its own tunnel.
+        when {
+            bypassApps && !selfInside -> apps.add(selfPackageName)
+            !bypassApps && selfInside -> apps.add(selfPackageName)
+            else -> apps.remove(selfPackageName)
+        }
 
         apps.forEach {
             try {
@@ -356,6 +385,7 @@ class CoreVpnService : VpnService(), ServiceControl {
 //        val info = loadVpnNetworkInfo(configName, emptyInfo)!! + (lastNetworkInfo ?: emptyInfo)
 //        saveVpnNetworkInfo(configName, info)
         isRunning = false
+        TunnelSelf.vpnService = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
                 connectivity.unregisterNetworkCallback(defaultNetworkCallback)

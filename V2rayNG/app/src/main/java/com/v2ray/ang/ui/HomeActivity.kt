@@ -28,6 +28,8 @@ import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
+import com.v2ray.ang.handler.AdSignalOverride
+import com.v2ray.ang.handler.AdsGate
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.AutoSelect
 import com.v2ray.ang.handler.EthaSubscription
@@ -63,6 +65,7 @@ class HomeActivity : HelperBaseActivity() {
     private val mainViewModel: MainViewModel by viewModels()
     private var sub: SubscriptionCache? = null
     private var connecting = false        // waiting for the core to report started / stopped
+    private var wasRunning: Boolean? = null   // null until the first state arrives: opening Home while connected is no connect
     private var refreshingQuietly = false // a background subscription refresh is running
     private var clipboardTried: String? = null   // the link last taken from the clipboard (no second import of the same one)
     private var pendingConnect = false    // waiting for a real-delay batch to pick the line
@@ -99,6 +102,10 @@ class HomeActivity : HelperBaseActivity() {
         binding.btnScan.setOnClickListener { scanLink() }
         binding.btnRefresh.setOnClickListener { refreshServers() }
         binding.btnRenew.setOnClickListener { Utils.openUri(this, AppConfig.ETHA_RENEW_URL) }
+        // Google Play takes payment for digital services through its own billing only, so the
+        // Play build does not send anyone off to buy; Support still reaches the same people.
+        binding.btnRenew.isVisible = !Updates.isPlay()
+        binding.spaceRenew.isVisible = !Updates.isPlay()
         binding.btnSupport.setOnClickListener { Utils.openUri(this, AppConfig.ETHA_SUPPORT_URL) }
         binding.btnTest.setOnClickListener { testAgain() }
         binding.panelServer.setOnClickListener { showServerSheet() }
@@ -108,8 +115,24 @@ class HomeActivity : HelperBaseActivity() {
             connecting = false
             render()
             if (running) mainViewModel.testCurrentServerRealPing()
+            if (running && wasRunning == false) {
+                // The Play build's ad, over the tunnel and with the exit's locale (neutral until the
+                // probe names the country); the connection lasts only if it is watched through.
+                AdSignalOverride.ensure()   // usually on already, from the network watch
+                AdsGate.showAfterConnect(this, onSkipped = {
+                    CoreServiceManager.stopVService(this)
+                    toastError(R.string.skyray_ad_required)
+                }, onReady = {})
+            }
+            if (!running) AdsGate.onTunnelDown()
+            wasRunning = running
         }
-        mainViewModel.updateTestResultAction.observe(this) { lastProbe = it; renderChip() }
+        mainViewModel.updateTestResultAction.observe(this) {
+            lastProbe = it
+            renderChip()
+            // "(DE) 1.2.3.4", seen through the tunnel: the ad signals follow the exit's country.
+            AdSignalOverride.refine(AdSignalOverride.countryFromProbe(it?.lines()?.lastOrNull()))
+        }
         // every ping lands in the panel and the open sheet as it is measured (the results are cleared when a test starts)
         mainViewModel.updateListAction.observe(this) { renderServerPanel(); serverSheet?.render() }
         mainViewModel.testsFinished.observe(this) {
@@ -141,6 +164,8 @@ class HomeActivity : HelperBaseActivity() {
                 render()
             }
         }
+        // The exit's locale while the VPN carries this app, the device's otherwise (Play build).
+        AdSignalOverride.watch()
         mainViewModel.startListenBroadcast()
         mainViewModel.initAssets(assets)
         SubscriptionUpdater.sync()
@@ -230,8 +255,9 @@ class HomeActivity : HelperBaseActivity() {
         )
         // the hint under the state: "Tap to connect" + what Auto does; connected, the chip takes its place
         binding.tvConnectHint.isVisible = !running
-        binding.tvConnectHint.text = if (isPinned()) getString(R.string.etha_tap_to_connect)
-            else getString(R.string.etha_tap_to_connect) + "\n" + getString(R.string.etha_auto_hint)
+        binding.tvConnectHint.text = (if (isPinned()) getString(R.string.etha_tap_to_connect)
+            else getString(R.string.etha_tap_to_connect) + "\n" + getString(R.string.etha_auto_hint)) +
+            if (AdsGate.SHOWS_ADS) "\n" + getString(R.string.skyray_ad_hint) else ""
         binding.btnConnect.isEnabled = !connecting && !pendingConnect
         binding.btnConnect.backgroundTintList = ColorStateList.valueOf(
             ContextCompat.getColor(this, if (running) R.color.etha_green else R.color.etha_blue)
