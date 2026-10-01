@@ -7,6 +7,7 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.ContextCompat
@@ -38,14 +39,14 @@ abstract class BaseActivity : AppCompatActivity() {
     private var progressBar: LinearProgressIndicator? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Edge-to-edge on every Android version (the default from SDK 35): the base layout's fitsSystemWindows keeps
+        // the content clear of the bars; the bars themselves show the dark ground.
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        if (!Utils.getDarkModeStatus(this)) {
-            WindowCompat.getInsetsController(window, window.decorView).apply {
-                isAppearanceLightStatusBars = true
-            }
-        }
+        // the app is dark in every mode (SkyRay 1.3): light icons in the status bar always
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
     }
 
     /**

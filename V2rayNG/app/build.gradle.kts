@@ -17,8 +17,8 @@ android {
         targetSdk = 37
         // 4000000 + the build number: the same code in every ABI split and in the Play bundle, so a
         // phone can move between the direct APK and the Play install (the updater compares versionName).
-        versionCode = 4000132
-        versionName = "1.3.2"
+        versionCode = 4000133
+        versionName = "1.3.3"
         multiDexEnabled = true
         manifestPlaceholders["subHost"] = "fra.skyrayconfig.org"   // AppConfig.ETHA_SUB_HOST: the only link address
 
@@ -46,7 +46,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 on (Play's code-optimisation threshold); proguard-rules.pro keeps what reflection, gson, JNI and
+            // the manifest reach by name. The mapping file ships with every release (mapping.txt next to the APKs).
+            isMinifyEnabled = true
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -84,9 +84,13 @@ class ScannerActivity : HelperBaseActivity() {
                 return@launchFileChooser
             }
             try {
-                val inputStream = contentResolver.openInputStream(uri)
-                val bitmap = BitmapFactory.decodeStream(inputStream)
-                inputStream?.close()
+                // bounds first, then a downsampled decode: a 48-megapixel photo must not be loaded whole
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                var sample = 1
+                while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1600) sample *= 2
+                val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+                val bitmap = contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
 
                 val text = QRCodeDecoder.syncDecodeQRCode(bitmap)
                 if (text.isNullOrEmpty()) {

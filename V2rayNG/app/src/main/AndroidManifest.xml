@@ -54,6 +54,17 @@
         android:theme="@style/AppThemeDayNight.NoActionBar"
         android:usesCleartextTraffic="true">
 
+        <!-- The scanner libraries pin their activities to an orientation; Android 16 ignores that on large screens
+             and Play flags it, so both are freed here (the scanner view handles rotation itself). -->
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            android:screenOrientation="unspecified"
+            tools:replace="android:screenOrientation" />
+        <activity
+            android:name="io.github.g00fy2.quickie.QRScannerActivity"
+            android:screenOrientation="unspecified"
+            tools:replace="android:screenOrientation" />
+
         <!-- EthaVPN: the one-screen home is the launcher; the full v2rayNG UI lives under Advanced -->
         <activity
             android:name=".ui.HomeActivity"

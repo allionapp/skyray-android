@@ -169,6 +169,8 @@ jobs:
         CODE=$(grep -oP 'versionCode = \K[0-9]+' ${{ github.workspace }}/V2rayNG/app/build.gradle.kts)
         MIN=$(tr -d ' \n' < ${{ github.workspace }}/min_supported.txt 2>/dev/null || echo "$VERSION")
         NOTES=$( (cat ${{ github.workspace }}/RELEASE_NOTES.md 2>/dev/null || true) | head -c 1500 | jq -Rs .)
+        # R8's mapping file, for reading obfuscated stack traces of this exact build
+        cp ${{ github.workspace }}/V2rayNG/app/build/outputs/mapping/directRelease/mapping.txt "SkyRay_${VERSION}_mapping.txt"
         ASSETS=$(for f in SkyRay_*.apk; do
           abi=${f#SkyRay_${VERSION}_}; abi=${abi%.apk}      # arm64-v8a, armeabi-v7a, x86, x86_64, universal
           printf '{"abi":"%s","name":"%s","size":%s,"sha256":"%s"}\n' "$abi" "$f" "$(stat -c %s "$f")" "$(sha256sum "$f" | cut -d' ' -f1)"
@@ -199,6 +201,7 @@ jobs:
           ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/direct/release/SkyRay_*.aab
           ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/direct/release/latest.json
           ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/direct/release/signing-cert-sha256.txt
+          ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/direct/release/SkyRay_*_mapping.txt
 
   sign-and-release:
     needs: build
@@ -223,7 +226,7 @@ jobs:
           PASS_ARGS=()
           if [ -n "$GPG_PASSPHRASE" ]; then PASS_ARGS=(--pinentry-mode loopback --passphrase-fd 3); fi
           mkdir -p release-files
-          for f in release/SkyRay_*.apk release/SkyRay_*.aab release/latest.json; do
+          for f in release/SkyRay_*.apk release/SkyRay_*.aab release/latest.json release/SkyRay_*_mapping.txt; do
             cp "$f" release-files/
             gpg --batch --yes "${PASS_ARGS[@]}" --local-user "$KEY" --detach-sign --output "release-files/$(basename "$f").sig" "$f" 3<<<"$GPG_PASSPHRASE"
           done
