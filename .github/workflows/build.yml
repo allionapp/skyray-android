@@ -31,6 +31,8 @@ jobs:
       uses: actions/checkout@v7
       with:
         submodules: 'recursive'
+        # the Xray core submodule (allionapp/AndroidLibXrayLite): public, or readable with this token
+        token: ${{ secrets.SUBMODULE_TOKEN || github.token }}
         fetch-depth: '0'
 
     - name: Setup Android SDK
@@ -73,21 +75,28 @@ jobs:
       run: |
         cp -r ${{ github.workspace }}/libs ${{ github.workspace }}/V2rayNG/app
 
-    - name: Fetch AndroidLibXrayLite tag
-      run: |
-        pushd AndroidLibXrayLite
-        CURRENT_TAG=$(git describe --tags --abbrev=0)
-        echo "Current tag in this repo: $CURRENT_TAG"
-        echo "CURRENT_TAG=$CURRENT_TAG" >> $GITHUB_ENV
-        popd
-
-    - name: Download libv2ray
-      uses: robinraju/release-downloader@v1.13
+    # The Xray core is built from the AndroidLibXrayLite submodule, not downloaded from 2dust's
+    # releases: SkyRay's core adds RegisterSocketProtector, which keeps the core's own sockets out of
+    # the VPN so the app itself (its ad requests among it) can ride the tunnel. Upstream's library
+    # does not have it, and the app does not compile against it. Same steps as the core's own CI.
+    - name: Setup Go (for the Xray core)
+      uses: actions/setup-go@v6
       with:
-        repository: '2dust/AndroidLibXrayLite'
-        tag: ${{ env.CURRENT_TAG }}
-        fileName: 'libv2ray.aar'
-        out-file-path: V2rayNG/app/libs/
+        go-version-file: 'AndroidLibXrayLite/go.mod'
+        cache-dependency-path: 'AndroidLibXrayLite/go.sum'
+
+    - name: Build libv2ray (the Xray core) from the submodule
+      run: |
+        go install golang.org/x/mobile/cmd/gomobile@latest
+        export ANDROID_NDK_HOME=$NDK_HOME
+        cd AndroidLibXrayLite
+        bash gen_assets.sh download
+        gomobile init
+        gomobile bind -v -androidapi 24 -trimpath -ldflags='-s -w -buildid= -checklinkname=0' -o libv2ray.aar ./
+        mkdir -p ${{ github.workspace }}/V2rayNG/app/libs
+        cp libv2ray.aar ${{ github.workspace }}/V2rayNG/app/libs/
+        unzip -p libv2ray.aar classes.jar > "$RUNNER_TEMP/libv2ray-classes.jar"
+        unzip -l "$RUNNER_TEMP/libv2ray-classes.jar" | grep -q 'libv2ray/SocketProtector' || { echo "::error::libv2ray has no SocketProtector"; exit 1; }
 
     - name: Setup Java
       uses: actions/setup-java@v5
