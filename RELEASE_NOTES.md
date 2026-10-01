@@ -1,1 +1,1 @@
-A new look: a dark ground, a glowing Connect button, the server you are on under the state, and a server sheet that opens from the bottom with Auto on top and the fastest servers first. Ping all shows every result as it lands; your server changes only when you connect or pick one. Settings has Share this app.
+Fixes for the new look: the settings icon and the icons in Settings were black on the dark ground; the server list opens filled.

@@ -108,8 +108,9 @@ class ServerSheet(
 
     init {
         setContentView(root)
-        behavior.state = BottomSheetBehavior.STATE_EXPANDED
         behavior.skipCollapsed = true
+        behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        setOnShowListener { behavior.state = BottomSheetBehavior.STATE_EXPANDED }   // never half-open: the rows must show
         root.findViewById<View>(R.id.row_auto).setOnClickListener { dismiss(); onPick(null) }
         root.findViewById<View>(R.id.btn_sheet_test).setOnClickListener { onTest() }
         more.setOnClickListener { expanded = !expanded; render() }
@@ -119,6 +120,7 @@ class ServerSheet(
     fun render() {
         val ctx = context
         val candidates = ServerPicker.sortedCandidates(AutoSelect.candidates(subId))
+        com.v2ray.ang.util.LogUtil.i(com.v2ray.ang.AppConfig.TAG, "ServerSheet: ${candidates.size} servers, expanded=$expanded")
         val selected = MmkvManager.getSelectServer()
         pinned = MmkvManager.decodeSettingsBool(com.v2ray.ang.AppConfig.PREF_ETHA_PINNED, false)
 
